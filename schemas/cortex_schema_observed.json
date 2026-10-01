@@ -1,0 +1,371 @@
+{
+  "dataset": "cortex",
+  "n_obs": 297927,
+  "n_vars": 33538,
+  "obs_index": {
+    "name": "CellID",
+    "sample_values": [
+      "10X298_1:TGTGATGGTCCAGCAC",
+      "10X298_1:ATGCATGGTTAAAGTG",
+      "10X298_1:TTGGGCGTCACGTAGT",
+      "10X298_1:TACGCTCTCCCGAGGT",
+      "10X298_1:TTGCCTGCAAGTTGGG"
+    ]
+  },
+  "var_index": {
+    "name": "Gene",
+    "sample_values": [
+      "CFAP52",
+      "TP73",
+      "LHX1",
+      "CFAP126",
+      "BHMT"
+    ]
+  },
+  "obs": {
+    "Age": {
+      "dtype": "float64",
+      "n_unique": 13
+    },
+    "Agetext": {
+      "dtype": "category",
+      "n_unique": 13
+    },
+    "Ageunit": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "All_fc_analysis_id": {
+      "dtype": "int64",
+      "n_unique": 81
+    },
+    "Analysis": {
+      "dtype": "category",
+      "n_unique": 27
+    },
+    "CellCycle": {
+      "dtype": "float64",
+      "n_unique": 195579
+    },
+    "CellCycle_G1": {
+      "dtype": "float64",
+      "n_unique": 138126
+    },
+    "CellCycle_G2M": {
+      "dtype": "float64",
+      "n_unique": 152095
+    },
+    "CellCycle_S": {
+      "dtype": "float64",
+      "n_unique": 91340
+    },
+    "Cellconc": {
+      "dtype": "category",
+      "n_unique": 17
+    },
+    "Chemistry": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "Clusters": {
+      "dtype": "int64",
+      "n_unique": 55
+    },
+    "ClustersModularity": {
+      "dtype": "int64",
+      "n_unique": 55
+    },
+    "ClustersSurprise": {
+      "dtype": "int64",
+      "n_unique": 950
+    },
+    "Cmobarcodes": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Comment": {
+      "dtype": "category",
+      "n_unique": 11
+    },
+    "CreationDate": {
+      "dtype": "category",
+      "n_unique": 81
+    },
+    "Datecaptured": {
+      "dtype": "category",
+      "n_unique": 15
+    },
+    "Donor": {
+      "dtype": "category",
+      "n_unique": 15
+    },
+    "DoubletFinderFlag": {
+      "dtype": "int64",
+      "n_unique": 1
+    },
+    "DoubletFinderScore": {
+      "dtype": "float64",
+      "n_unique": 105
+    },
+    "Editat": {
+      "dtype": "category",
+      "n_unique": 81
+    },
+    "Editby": {
+      "dtype": "category",
+      "n_unique": 3
+    },
+    "Id": {
+      "dtype": "int64",
+      "n_unique": 81
+    },
+    "IsCycling": {
+      "dtype": "uint8",
+      "n_unique": 2
+    },
+    "Label": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "MT_ratio": {
+      "dtype": "float64",
+      "n_unique": 217304
+    },
+    "MeanTotalUMI": {
+      "dtype": "float64",
+      "n_unique": 81
+    },
+    "Method": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "NGenes": {
+      "dtype": "float64",
+      "n_unique": 6711
+    },
+    "Name": {
+      "dtype": "category",
+      "n_unique": 81
+    },
+    "Neuronprop": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Numpooledanimals": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Outliers": {
+      "dtype": "int64",
+      "n_unique": 1
+    },
+    "OutliersModularity": {
+      "dtype": "int64",
+      "n_unique": 1
+    },
+    "OutliersSurprise": {
+      "dtype": "int64",
+      "n_unique": 1
+    },
+    "PassedQC": {
+      "dtype": "uint8",
+      "n_unique": 2
+    },
+    "PassedQC_MT_ratio": {
+      "dtype": "uint8",
+      "n_unique": 2
+    },
+    "PassedQC_TotalUMI": {
+      "dtype": "uint8",
+      "n_unique": 2
+    },
+    "PassedQC_UMIPerGene": {
+      "dtype": "uint8",
+      "n_unique": 2
+    },
+    "PassedQC_UnsplicedRatio": {
+      "dtype": "uint8",
+      "n_unique": 2
+    },
+    "Plugdate": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Project": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Roi": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "SampleID": {
+      "dtype": "category",
+      "n_unique": 81
+    },
+    "Sampleok": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "Sex": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Shortname": {
+      "dtype": "category",
+      "n_unique": 24
+    },
+    "Species": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Strain": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "Subset": {
+      "dtype": "category",
+      "n_unique": 10
+    },
+    "Targetnumcells": {
+      "dtype": "category",
+      "n_unique": 4
+    },
+    "Tissue": {
+      "dtype": "category",
+      "n_unique": 9
+    },
+    "TotalRNA": {
+      "dtype": "float64",
+      "n_unique": 6675
+    },
+    "TotalUMI": {
+      "dtype": "float64",
+      "n_unique": 25264
+    },
+    "Transcriptome": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "_X": {
+      "dtype": "float32",
+      "n_unique": 297290
+    },
+    "_Y": {
+      "dtype": "float32",
+      "n_unique": 297241
+    },
+    "passedQC": {
+      "dtype": "uint8",
+      "n_unique": 1
+    },
+    "unspliced_ratio": {
+      "dtype": "float64",
+      "n_unique": 280543
+    },
+    "velocyto.__version__": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "velocyto.logic": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "batch": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "_scvi_batch": {
+      "dtype": "int8",
+      "n_unique": 1
+    },
+    "_scvi_labels": {
+      "dtype": "int8",
+      "n_unique": 1
+    },
+    "leiden_scVI": {
+      "dtype": "category",
+      "n_unique": 13
+    },
+    "louvain": {
+      "dtype": "category",
+      "n_unique": 7
+    },
+    "classes": {
+      "dtype": "category",
+      "n_unique": 4
+    },
+    "mark": {
+      "dtype": "int64",
+      "n_unique": 2
+    },
+    "CellID": {
+      "dtype": "object",
+      "n_unique": 297927
+    },
+    "CellCycleFraction": {
+      "dtype": "float32",
+      "n_unique": 187711
+    },
+    "Cycling": {
+      "dtype": "bool",
+      "n_unique": 2
+    },
+    "CellCyclePhase": {
+      "dtype": "category",
+      "n_unique": 5
+    },
+    "CellClass": {
+      "dtype": "category",
+      "n_unique": 5
+    }
+  },
+  "var": {
+    "Chromosome": {
+      "dtype": "category",
+      "n_unique": 40
+    },
+    "Accession": {
+      "dtype": "object",
+      "n_unique": 33538
+    },
+    "Start": {
+      "dtype": "int64",
+      "n_unique": 33465
+    },
+    "End": {
+      "dtype": "int64",
+      "n_unique": 33423
+    }
+  },
+  "obsm_keys": [
+    "PCA",
+    "TSNE",
+    "UMAP",
+    "UMAP3D",
+    "X_scVI",
+    "X_umap",
+    "nhoods"
+  ],
+  "varm_keys": [],
+  "uns_keys": [
+    "CellCyclePhase_colors",
+    "CellCycle_phase_colors",
+    "_scvi_manager_uuid",
+    "_scvi_uuid",
+    "leiden",
+    "leiden_scVI_colors",
+    "louvain",
+    "louvain_colors",
+    "neighbors",
+    "new_classes_colors",
+    "try_colors",
+    "umap"
+  ],
+  "layers": [
+    "ambiguous",
+    "matrix",
+    "spliced",
+    "unspliced"
+  ]
+}

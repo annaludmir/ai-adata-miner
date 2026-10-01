@@ -1,0 +1,161 @@
+{
+  "dataset": "human_dev",
+  "n_obs": 1665937,
+  "n_vars": 59459,
+  "obs_index": {
+    "name": "CellID",
+    "sample_values": [
+      "10X89_1:AAACGGGAGGCTACGA",
+      "10X89_1:ACGAGGAAGAGCCTAG",
+      "10X89_1:ACGCCAGTCGATAGAA",
+      "10X89_1:CCGGGATCAGACACTT",
+      "10X89_1:CGACTTCTCCCACTTG"
+    ]
+  },
+  "var_index": {
+    "name": "Accession",
+    "sample_values": [
+      "ENSG00000223972.5",
+      "ENSG00000227232.5",
+      "ENSG00000278267.1",
+      "ENSG00000284332.1",
+      "ENSG00000268020.3"
+    ]
+  },
+  "obs": {
+    "Age": {
+      "dtype": "category",
+      "n_unique": 18
+    },
+    "CellClass": {
+      "dtype": "category",
+      "n_unique": 12
+    },
+    "Chemistry": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "Region": {
+      "dtype": "category",
+      "n_unique": 10
+    },
+    "Subregion": {
+      "dtype": "category",
+      "n_unique": 18
+    },
+    "organism_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "disease_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "self_reported_ethnicity_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "assay_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 2
+    },
+    "sex_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "development_stage_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 12
+    },
+    "donor_id": {
+      "dtype": "category",
+      "n_unique": 26
+    },
+    "suspension_type": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "tissue_type": {
+      "dtype": "category",
+      "n_unique": 1
+    },
+    "dissection": {
+      "dtype": "category",
+      "n_unique": 31
+    },
+    "tissue_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 27
+    },
+    "cell_type_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 12
+    },
+    "fraction_mitochondrial": {
+      "dtype": "float32",
+      "n_unique": 906254
+    },
+    "fraction_unspliced": {
+      "dtype": "float32",
+      "n_unique": 1368739
+    },
+    "cell_cycle_score": {
+      "dtype": "float32",
+      "n_unique": 563620
+    },
+    "total_genes": {
+      "dtype": "category",
+      "n_unique": 9369
+    },
+    "total_UMIs": {
+      "dtype": "category",
+      "n_unique": 38045
+    },
+    "sample_id": {
+      "dtype": "category",
+      "n_unique": 340
+    },
+    "cluster_id": {
+      "dtype": "category",
+      "n_unique": 617
+    }
+  },
+  "var": {
+    "Accession": {
+      "dtype": "object",
+      "n_unique": 59459
+    },
+    "Chromosome": {
+      "dtype": "category",
+      "n_unique": 46
+    },
+    "End": {
+      "dtype": "category",
+      "n_unique": 59295
+    },
+    "GeneTotalUMIs": {
+      "dtype": "uint32",
+      "n_unique": 25162
+    },
+    "Start": {
+      "dtype": "category",
+      "n_unique": 59309
+    },
+    "Gene": {
+      "dtype": "object",
+      "n_unique": 59459
+    }
+  },
+  "obsm_keys": [
+    "Factors",
+    "X_Embedding"
+  ],
+  "varm_keys": [
+    "Loadings"
+  ],
+  "uns_keys": [
+    "batch_condition",
+    "title"
+  ],
+  "layers": []
+}
