@@ -16,7 +16,22 @@ deliberately left for step 3. Written for whoever picks up the repo next.
 | layers | `spliced`, `unspliced`, `ambiguous`, `matrix` | none |
 | cycle phase label | `PostM` | `Post-M` |
 
-Three traps this pipeline handles, each of which silently corrupts results if missed:
+### Chemistry is a confound, not a covariate
+
+Both datasets mix 10x v2 and v3, and in `human_dev` the two cover **almost
+disjoint age ranges** — v2 roughly 6–10 pcw, v3 roughly 5–5.5 and 11.5–14, with
+only a handful of ages in both. A gene that "rises with development" in pooled
+data may simply be one that v3 captures better.
+
+So **the pipeline stratifies by default**: `--chemistry each` runs v2 and v3
+separately into `csv_exports/<dataset>__v2/` and `__v3/`. `--chemistry all`
+pools them into `csv_exports/<dataset>/`.
+
+Stratifying removes the confound but costs coverage — neither chemistry spans
+development alone. Script 18 quantifies that trade-off on the real file before
+anything is interpreted; read `18_chemistry/age_chemistry_overlap.csv` first.
+
+Three further traps this pipeline handles, each of which silently corrupts results if missed:
 
 1. **`human_dev.var['gene_symbol']` holds accessions, not symbols.** The real
    symbols are in `var['Gene']`. `lib.io_utils.gene_frame` detects and corrects this.
@@ -49,6 +64,7 @@ only 09 and 12 stream the matrix.
 | 14 | `14_normalization_diagnostics` | **TMM** scaling factors (Robinson & Oshlack) and **MA diagnostics** per group; per-group log2-CPM quantiles for box/violin plots. Flags groups whose median M departs from 0 — composition bias that CPM cannot fix |
 | 15 | `15_sample_relationships` | **Correlation matrices** (Pearson + Spearman), **hierarchical clustering** under all three linkages with merge heights, and **PCA** with variance explained, sample scores and gene loadings |
 | 16 | `16_expression_patterns` | **Z-scored K-means** gene clustering with a K sweep reporting homogeneity *and* separation, per-cluster mean ± SD profiles, and the Z-score matrix for heatmaps |
+| 18 | `18_chemistry_comparability` | **Pooled by design.** Measures the v2/v3 overlap: cells, donors and age span per chemistry, and per level of every covariate whether both chemistries are present with enough cells to compare. Flags donor nested in chemistry |
 | 17 | `17_gsea_panels` | **GSEA** of each panel against each group's ranked gene list: weighted running-sum ES, gene-set permutation p, BH-FDR, and leading-edge genes |
 
 ## Queued for step 3 — CSV-only, no h5ad needed
@@ -120,7 +136,11 @@ State this explicitly so step 3 does not attempt it from tables:
    bias of full-length bulk protocols. Both these datasets are 10x UMI data counted
    from the 3' end, where that bias does not exist — dividing by gene length would
    *introduce* an artefact. Use CPM/CP10K within a sample and TMM between groups.
-7. **GSEA p-values here come from gene-set permutation**, which does not preserve
+7. **Never compare a v2 group against a v3 group** and call the difference
+   biological. Within `<dataset>__v2/` everything is chemistry-matched by
+   construction; across the two folders it is not. For a contrast that must
+   span chemistries, restrict to the ages script 18 marks `comparable`.
+8. **GSEA p-values here come from gene-set permutation**, which does not preserve
    gene–gene correlation and is therefore anti-conservative for co-regulated panels.
    The ranking of hypotheses is sound; the absolute p is optimistic. Sample-label
    permutation would need per-donor replicates and belongs in step 3.

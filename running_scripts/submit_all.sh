@@ -24,6 +24,9 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 DATASETS="${DATASETS:-cortex human_dev}"
+# 'each' runs v2 and v3 separately. Stage 2 fans out over dataset x chemistry so
+# the extra pass costs cluster slots rather than wall time.
+CHEMISTRY="${CHEMISTRY:-each}"
 MAIL_SUMMARY="${MAIL_SUMMARY:-false}"
 MAIL_HELPER="${MAIL_HELPER:-/miridan-data/annaludmir/ndd_gene_modules/running_scripts/mail_job_summary.sh}"
 
@@ -41,21 +44,30 @@ pass_env() {
 [[ -n "${LIMIT_CELLS:-}" ]] && \
   echo "NOTE: LIMIT_CELLS=${LIMIT_CELLS} -- this is a SMOKE TEST; outputs are partial." && echo
 
-STAGE1=$(sbatch --parsable --export="$(pass_env),DATASET=all" slurm_01_metadata.sh)
+STAGE1=$(sbatch --parsable --export="$(pass_env),DATASET=all,CHEMISTRY=${CHEMISTRY}" slurm_01_metadata.sh)
 printf 'stage 1  %-24s -> job %s\n' "metadata (all)" "$STAGE1"
+
+case "$CHEMISTRY" in
+  each) CHEMS="v2 v3" ;;
+  all)  CHEMS="all" ;;
+  *)    CHEMS="$CHEMISTRY" ;;
+esac
 
 STAGE2_IDS=()
 for ds in $DATASETS; do
-  jid=$(sbatch --parsable --dependency=afterok:"${STAGE1}" \
-               --job-name="aim_pbulk_${ds}" \
-               --export="$(pass_env),DATASET=${ds}" slurm_02_pseudobulk.sh)
-  STAGE2_IDS+=("$jid")
-  printf 'stage 2  %-24s -> job %s  (after %s)\n' "pseudobulk ${ds}" "$jid" "$STAGE1"
+  for ch in $CHEMS; do
+    jid=$(sbatch --parsable --dependency=afterok:"${STAGE1}" \
+                 --job-name="aim_pbulk_${ds}_${ch}" \
+                 --export="$(pass_env),DATASET=${ds},CHEMISTRY=${ch}" \
+                 slurm_02_pseudobulk.sh)
+    STAGE2_IDS+=("$jid")
+    printf 'stage 2  %-24s -> job %s  (after %s)\n' "pseudobulk ${ds} ${ch}" "$jid" "$STAGE1"
+  done
 done
 
 DEP=$(IFS=:; echo "${STAGE2_IDS[*]}")
 STAGE3=$(sbatch --parsable --dependency=afterok:"${DEP}" \
-                --export="$(pass_env),DATASET=all" slurm_03_derived.sh)
+                --export="$(pass_env),DATASET=all,CHEMISTRY=${CHEMISTRY}" slurm_03_derived.sh)
 printf 'stage 3  %-24s -> job %s  (after %s)\n' "derived analyses (all)" "$STAGE3" "$DEP"
 
 echo

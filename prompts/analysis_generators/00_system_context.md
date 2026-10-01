@@ -23,8 +23,16 @@ that make comparing them valid.
    and 26 in `human_dev`. Never compute a p-value over ~10^6 cells. Aggregate to
    donor or sample first (`sample__*` and `donor__*` pseudobulk tables exist for
    exactly this).
-2. **Age is nested in chemistry.** `05_confounds/confound_warnings.csv` quantifies
-   it. Any developmental claim must state this limitation or control for it.
+2. **Chemistry is a confound with age, and the CSVs are stratified for it.**
+   `csv_exports/<dataset>__v2/` and `__v3/` hold the per-chemistry results;
+   `csv_exports/<dataset>/` holds only the pooled-by-design steps (00, 07, 13, 18).
+   Work *within* one chemistry folder. Never compare a group from `__v2/`
+   against one from `__v3/` and report the difference as biological — v2 and v3
+   cover near-disjoint age ranges. If a contrast must span chemistries, restrict
+   to the ages that `18_chemistry/age_chemistry_overlap.csv` marks `comparable`,
+   and say how many cells that leaves. Check
+   `18_chemistry/chemistry_summary.csv` for whether donor is nested in
+   chemistry: if it is, donor-level replication cannot separate the two.
 3. **Composition data are compositional.** Use `log2oe_*` tables for enrichment,
    not raw `fractions_*`, which cannot rise independently.
 4. **Pick the right expression table.**

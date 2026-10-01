@@ -27,7 +27,7 @@ import config
 __all__ = [
     "log", "read_obs", "read_var", "read_elem_at", "list_h5ad_keys", "XReader",
     "resolve_role", "resolve_cluster_columns", "resolve_qc_frame",
-    "coerce_numeric", "gene_frame", "harmonise_labels", "Manifest",
+    "coerce_numeric", "gene_frame", "harmonise_labels", "Manifest", "chemistry_mask", "load_obs",
     "add_derived_obs_columns",
 ]
 
@@ -240,6 +240,43 @@ def add_derived_obs_columns(obs: pd.DataFrame, dataset_key: str) -> pd.DataFrame
         out["cyclephase_h"] = harmonise_labels(obs[phase_col], "cyclephase")
     out["dataset"] = dataset_key
     return out
+
+
+def load_obs(path, dataset_key: str, chemistry: str | None = None,
+             limit_cells: int | None = None):
+    """Read .obs, apply the chemistry filter, add the derived columns.
+
+    Returns (obs, keep) where `keep` is a boolean array over the rows that were
+    read, so callers can subset a positionally-aligned obsm matrix the same way.
+    Returns (None, None) when a stratified run was requested but the file has no
+    chemistry column -- the caller must skip rather than analyse every cell and
+    mislabel it as one chemistry.
+    """
+    obs = read_obs(path)
+    if limit_cells:
+        obs = obs.iloc[:limit_cells]
+    mask = chemistry_mask(obs, chemistry)
+    if mask is None:
+        return None, None
+    keep = mask.to_numpy()
+    obs = obs.loc[keep]
+    return add_derived_obs_columns(obs, dataset_key), keep
+
+
+def chemistry_mask(obs: pd.DataFrame, chemistry: str | None) -> pd.Series | None:
+    """Boolean mask selecting one chemistry's cells.
+
+    Returns an all-True mask when `chemistry` is None (pooled), and None when a
+    stratified run was asked for but the file has no chemistry column -- the
+    caller must then skip rather than silently analyse everything and label it
+    'v2'.
+    """
+    if chemistry is None:
+        return pd.Series(True, index=obs.index)
+    col = resolve_role(obs, "chemistry")
+    if col is None:
+        return None
+    return obs[col].astype(str).str.strip() == chemistry
 
 
 def gene_frame(var: pd.DataFrame, dataset_key: str) -> pd.DataFrame:

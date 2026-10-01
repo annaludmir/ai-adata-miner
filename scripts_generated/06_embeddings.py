@@ -32,8 +32,8 @@ import scipy.sparse as sp
 
 import config
 from lib import cli
-from lib.io_utils import (Manifest, add_derived_obs_columns, list_h5ad_keys,
-                          log, read_elem_at, read_obs, resolve_role)
+from lib.io_utils import (Manifest, list_h5ad_keys, load_obs,
+                          log, read_elem_at, resolve_role)
 
 SCRIPT = "06_embeddings"
 SUBDIR = "06_embeddings"
@@ -71,14 +71,23 @@ def knn_mixing(coords: np.ndarray, labels: pd.Series, k: int) -> pd.DataFrame:
     return out.reset_index()
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
     path = cli.resolve_h5ad(key)
-    man = Manifest(key, SCRIPT)
+    man = Manifest(ns, SCRIPT)
 
-    obs = add_derived_obs_columns(read_obs(path), key)
-    if args.limit_cells:
-        obs = obs.iloc[:args.limit_cells]
+    obs, keep = load_obs(path, key, chem, args.limit_cells)
+    if obs is None:
+        log(f"  no chemistry column in this file -- cannot run chemistry={chem}; skipping")
+        man.flush()
+        return
+    if len(obs) == 0:
+        log(f"  no cells with chemistry={chem}; skipping")
+        man.flush()
+        return
+    log(f"  {len(obs):,} cells after chemistry filter ({chem or 'pooled'})")
     keys = list_h5ad_keys(path)
     available = [k for k in config.EMBEDDING_KEYS if k in keys["obsm"]]
     available += [k for k in keys["obsm"] if k not in available]
@@ -108,6 +117,9 @@ def run(key: str, args) -> None:
             continue
         if args.limit_cells:
             mat = mat[:args.limit_cells]
+        # obsm rows align with the unfiltered cells; apply the same mask.
+        if keep is not None and mat.shape[0] == keep.size:
+            mat = mat[keep]
         if mat.shape[0] != len(obs):
             log(f"  skipping obsm/{ekey}: {mat.shape[0]} rows != {len(obs)} cells")
             continue
@@ -196,8 +208,8 @@ def run(key: str, args) -> None:
 
 def main() -> None:
     args = cli.build_parser(__doc__).parse_args()
-    for key in cli.selected_datasets(args):
-        run(key, args)
+    for key, chem, ns in cli.dataset_variants(args):
+        run(key, args, chem, ns)
 
 
 if __name__ == "__main__":

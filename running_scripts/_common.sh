@@ -27,6 +27,9 @@ export AI_ADATA_OUT_ROOT="${AI_ADATA_OUT_ROOT:-${AIM_ROOT}/csv_exports}"
 
 # Which dataset(s) to process, and the knobs worth changing per submission.
 DATASET="${DATASET:-all}"
+# Both datasets mix v2 and v3 chemistry, and the two cover near-disjoint age
+# ranges, so analyses run per chemistry by default (see script 18).
+CHEMISTRY="${CHEMISTRY:-each}"
 CHUNK_SIZE="${CHUNK_SIZE:-50000}"
 TOP_GENES="${TOP_GENES:-12000}"
 LIMIT_CELLS="${LIMIT_CELLS:-}"      # set to e.g. 20000 for a smoke test
@@ -47,6 +50,7 @@ aim_setup() {
   echo "csv exports: ${AI_ADATA_OUT_ROOT}"
   echo "dataset    : ${DATASET}"
   echo "chunk size : ${CHUNK_SIZE}"
+  echo "chemistry  : ${CHEMISTRY}"
   [[ -n "$LIMIT_CELLS" ]] && echo "LIMIT_CELLS: ${LIMIT_CELLS}  (SMOKE TEST -- results are partial)"
   echo "started    : $(date '+%F %T')"
   echo "=============================================================="
@@ -59,7 +63,7 @@ aim_setup() {
 # has already spent hours streaming the matrix.
 aim_run() {
   local stem="$1"; shift
-  local args=(--dataset "$DATASET" --chunk-size "$CHUNK_SIZE")
+  local args=(--dataset "$DATASET" --chunk-size "$CHUNK_SIZE" --chemistry "$CHEMISTRY")
   [[ -n "$LIMIT_CELLS" ]] && args+=(--limit-cells "$LIMIT_CELLS")
   args+=("$@")
 
@@ -92,7 +96,7 @@ aim_report() {
   local elapsed=$(( SECONDS - AIM_START ))
   {
     echo "job ${JOBID}  host=$(hostname)  exit=${rc}  elapsed=$((elapsed/3600))h$(( (elapsed%3600)/60 ))m"
-    echo "stage: ${AIM_STAGE:-unnamed}   dataset: ${DATASET}"
+    echo "stage: ${AIM_STAGE:-unnamed}   dataset: ${DATASET}   chemistry: ${CHEMISTRY}"
     echo "log:   ${OUTFILE}"
     [[ -n "$LIMIT_CELLS" ]] && echo "NOTE:  LIMIT_CELLS=${LIMIT_CELLS} -- this was a smoke test, not a full run"
     echo

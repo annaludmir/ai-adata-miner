@@ -44,6 +44,7 @@ aim_run 05_covariate_confounds
 aim_run 06_embeddings
 aim_run 07_factor_modules      # needs varm/Loadings -- human_dev only, skips cortex
 aim_run 08_factor_activity
+aim_run 18_chemistry_comparability   # pooled by design: what survives stratification
 
 # 13 compares the two datasets, so it only means anything with both of them.
 if [[ "$DATASET" == "all" ]]; then

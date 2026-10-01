@@ -117,7 +117,26 @@ MAX_GROUPS_WIDE = 1_000        # refuse absurdly wide pseudobulk CSVs
 RANDOM_SEED = 0
 
 
+# Both datasets mix 10x v2 and v3 chemistry, and in human_dev the two cover
+# almost disjoint age ranges (v2 ~6-10 pcw, v3 ~5-5.5 and 11.5-14), so a
+# "developmental" change measured across pooled cells is partly the chemistry
+# switch. Analyses therefore run per chemistry by default; script 05 measures
+# the actual overlap on the real file.
+CHEMISTRIES = ("v2", "v3")
+
+
+def namespace(key: str, chemistry: str | None = None) -> str:
+    """csv_exports/ folder name for a dataset, optionally chemistry-stratified."""
+    return key if chemistry is None else f"{key}__{chemistry}"
+
+
+def base_dataset(ns: str) -> str:
+    """Inverse of namespace(): 'cortex__v2' -> 'cortex'."""
+    return ns.split("__")[0]
+
+
 def dataset(key: str) -> dict:
+    key = base_dataset(key)
     if key not in DATASETS:
         raise SystemExit(f"Unknown dataset {key!r}. Known: {', '.join(DATASETS)}")
     return DATASETS[key]

@@ -40,7 +40,7 @@ import config
 from lib import cli
 from lib.aggregate import GroupAggregator, combine_keys, group_codes
 from lib.io_utils import (Manifest, XReader, add_derived_obs_columns,
-                          gene_frame, log, read_obs, read_var,
+                          chemistry_mask, gene_frame, log, read_obs, read_var,
                           resolve_cluster_columns, resolve_role)
 from lib.panels import all_panel_genes
 
@@ -111,12 +111,28 @@ def select_genes(path, var: pd.DataFrame, genes: pd.DataFrame, top_n: int,
     return sel
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
     path = cli.resolve_h5ad(key)
-    man = Manifest(key, SCRIPT)
+    man = Manifest(ns, SCRIPT)
 
-    obs = add_derived_obs_columns(read_obs(path), key)
+    # obs stays FULL length here: X chunks are indexed against every cell, so
+    # the chemistry filter is applied to the group codes below (code -1, which
+    # GroupAggregator already excludes) rather than by subsetting obs.
+    obs_full = add_derived_obs_columns(read_obs(path), key)
+    chem_keep = chemistry_mask(obs_full, chem)
+    if chem_keep is None:
+        log(f"  no chemistry column in this file -- cannot run chemistry={chem}; skipping")
+        man.flush()
+        return
+    chem_keep = chem_keep.to_numpy()
+    if chem_keep.sum() == 0:
+        log(f"  no cells with chemistry={chem}; skipping")
+        man.flush()
+        return
+    obs = obs_full
     var = read_var(path)
     genes = gene_frame(var, key)
 
@@ -129,7 +145,9 @@ def run(key: str, args) -> None:
     n_cells = min(args.limit_cells, n_obs_total) if args.limit_cells else n_obs_total
     if args.limit_cells:
         obs = obs.iloc[:n_cells]
+        chem_keep = chem_keep[:n_cells]
         log(f"  LIMITED to first {n_cells:,} cells (smoke test)")
+    log(f"  chemistry={chem or 'pooled'}: {int(chem_keep.sum()):,} / {n_cells:,} cells")
 
     sel = select_genes(path, var, genes, args.top_genes, args.chunk_size,
                        args.limit_cells)
@@ -155,6 +173,12 @@ def run(key: str, args) -> None:
                 f"MAX_GROUPS_WIDE={config.MAX_GROUPS_WIDE}")
             skipped.append({"grouping": name, "n_levels": len(levels),
                             "reason": "exceeds MAX_GROUPS_WIDE"})
+            continue
+        # Excluding the other chemistry by code rather than by slicing X keeps
+        # the single streaming pass intact; the aggregator skips code -1.
+        codes = np.where(chem_keep, codes, -1)
+        if (codes >= 0).sum() == 0:
+            log(f"  skipping grouping '{name}': no cells left after the chemistry filter")
             continue
         aggs[name] = GroupAggregator(len(levels), n_kept, config.TARGET_SUM)
         codes_map[name], names_map[name] = codes, levels
@@ -219,8 +243,8 @@ def main() -> None:
                         help="max genes to export, ranked by total UMIs "
                              "(panel genes are always added)")
     args = parser.parse_args()
-    for key in cli.selected_datasets(args):
-        run(key, args)
+    for key, chem, ns in cli.dataset_variants(args):
+        run(key, args, chem, ns)
 
 
 if __name__ == "__main__":

@@ -46,12 +46,19 @@ That submits a three-stage chain:
 ```
 stage 1  metadata, both datasets      250G  12h   scripts 00-08, 13
    |
-   +--> stage 2  pseudobulk cortex    500G  48h   scripts 09, 12   ─┐ concurrent
-   +--> stage 2  pseudobulk human_dev 500G  48h   scripts 09, 12   ─┘
+   +--> stage 2  pseudobulk cortex v2    500G 48h  scripts 09, 12  ─┐
+   +--> stage 2  pseudobulk cortex v3    500G 48h  scripts 09, 12  ─┤ all
+   +--> stage 2  pseudobulk human_dev v2 500G 48h  scripts 09, 12  ─┤ concurrent
+   +--> stage 2  pseudobulk human_dev v3 500G 48h  scripts 09, 12  ─┘
    |
    v  (afterok on both)
 stage 3  derived analyses             200G  12h   scripts 10,11,14-17
 ```
+
+Stage 2 fans out over dataset x chemistry because the default `--chemistry each`
+needs one pass per chemistry; running them concurrently spends cluster slots
+instead of wall time. `CHEMISTRY=all ./submit_all.sh` halves the job count and
+pools the chemistries, at the cost of confounding age with the v2->v3 switch.
 
 The split exists for three reasons. Stage 1 never touches the count matrix, so
 holding 500G for it is waste. The two stage-2 jobs read different files and
@@ -77,6 +84,7 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | variable | default | notes |
 |---|---|---|
 | `DATASET` / `DATASETS` | `all` / `cortex human_dev` | which dataset(s) |
+| `CHEMISTRY` | `each` | `each` runs v2 and v3 apart; `all` pools them |
 | `LIMIT_CELLS` | unset | first N cells — smoke test; outputs are partial |
 | `CHUNK_SIZE` | `50000` | cells per streaming chunk (stage 2) |
 | `TOP_GENES` | `12000` | genes exported in pseudobulk; panel genes always added |

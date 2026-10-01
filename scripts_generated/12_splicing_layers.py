@@ -32,7 +32,8 @@ import config
 from lib import cli
 from lib.aggregate import GroupAggregator, group_codes
 from lib.io_utils import (Manifest, XReader, add_derived_obs_columns,
-                          gene_frame, list_h5ad_keys, log, read_obs, read_var,
+                          chemistry_mask, gene_frame, list_h5ad_keys, log,
+                          read_obs, read_var,
                           resolve_cluster_columns, resolve_role)
 
 SCRIPT = "12_splicing_layers"
@@ -59,10 +60,12 @@ def stream_layer(path, layer: str, codes: np.ndarray, n_groups: int,
     return agg
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
     path = cli.resolve_h5ad(key)
-    man = Manifest(key, SCRIPT)
+    man = Manifest(ns, SCRIPT)
 
     layers = list_h5ad_keys(path)["layers"]
     spliced = next((k for k in SPLICED_KEYS if k in layers), None)
@@ -73,7 +76,19 @@ def run(key: str, args) -> None:
         return
     log(f"  using layers '{spliced}' and '{unspliced}'")
 
+    # Same reasoning as script 09: keep obs full length and exclude the other
+    # chemistry through the group codes, so the layer pass stays one sweep.
     obs = add_derived_obs_columns(read_obs(path), key)
+    chem_keep = chemistry_mask(obs, chem)
+    if chem_keep is None:
+        log(f"  no chemistry column in this file -- cannot run chemistry={chem}; skipping")
+        man.flush()
+        return
+    chem_keep = chem_keep.to_numpy()
+    if chem_keep.sum() == 0:
+        log(f"  no cells with chemistry={chem}; skipping")
+        man.flush()
+        return
     var = read_var(path)
     genes = gene_frame(var, key)
     with XReader(path) as xr:
@@ -81,9 +96,11 @@ def run(key: str, args) -> None:
     n_cells = min(args.limit_cells, n_obs_total) if args.limit_cells else n_obs_total
     if args.limit_cells:
         obs = obs.iloc[:n_cells]
+        chem_keep = chem_keep[:n_cells]
+    log(f"  chemistry={chem or 'pooled'}: {int(chem_keep.sum()):,} / {n_cells:,} cells")
 
     # Reuse script 09's gene selection so the tables line up gene-for-gene.
-    sel_path = config.CSV_EXPORTS / key / "09_pseudobulk" / "gene_selection.csv"
+    sel_path = config.CSV_EXPORTS / ns / "09_pseudobulk" / "gene_selection.csv"
     if sel_path.exists():
         sel = pd.read_csv(sel_path)
         gene_mask = sel["selected"].to_numpy(dtype=bool)
@@ -111,7 +128,8 @@ def run(key: str, args) -> None:
     ratio_rows = []
     for name, series in groupings.items():
         codes, levels = group_codes(series)
-        if len(levels) > config.MAX_GROUPS_WIDE:
+        codes = np.where(chem_keep, codes, -1)
+        if len(levels) > config.MAX_GROUPS_WIDE or (codes >= 0).sum() == 0:
             continue
         log(f"  {name}: {len(levels)} groups -- streaming both layers...")
         s_agg = stream_layer(path, spliced, codes, len(levels), gene_mask, n_kept,
@@ -159,8 +177,8 @@ def run(key: str, args) -> None:
 
 def main() -> None:
     args = cli.build_parser(__doc__).parse_args()
-    for key in cli.selected_datasets(args):
-        run(key, args)
+    for key, chem, ns in cli.dataset_variants(args):
+        run(key, args, chem, ns)
 
 
 if __name__ == "__main__":

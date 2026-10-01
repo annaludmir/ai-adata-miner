@@ -36,7 +36,37 @@ def build_parser(description: str) -> argparse.ArgumentParser:
                         "flag kept for symmetry with --skip-existing)")
     p.add_argument("--skip-existing", action="store_true",
                    help="skip a dataset whose outputs for this script already exist")
+    p.add_argument("--chemistry", default="each",
+                   choices=["each", "all", "v2", "v3"],
+                   help="10x chemistry stratification. 'each' (the default) runs v2 "
+                        "and v3 separately into <dataset>__v2/ and <dataset>__v3/; "
+                        "'all' pools them into <dataset>/. Age and chemistry are "
+                        "heavily confounded in these data, so pooled results mix a "
+                        "developmental effect with the v2->v3 switch")
     return p
+
+
+def chemistry_values(args) -> list[str | None]:
+    """Chemistries to iterate. None means 'pool everything'."""
+    choice = getattr(args, "chemistry", "each")
+    if choice == "all":
+        return [None]
+    if choice == "each":
+        return list(config.CHEMISTRIES)
+    return [choice]
+
+
+def dataset_variants(args):
+    """Yield (dataset_key, chemistry, namespace) for every unit of work.
+
+    The namespace is what the CSVs are filed under: 'cortex' when pooled,
+    'cortex__v2' when stratified. Keeping the chemistry in the folder name --
+    rather than only in a column -- means a downstream analysis cannot
+    accidentally pool the two by globbing.
+    """
+    for key in selected_datasets(args):
+        for chem in chemistry_values(args):
+            yield key, chem, config.namespace(key, chem)
 
 
 def selected_datasets(args) -> list[str]:
@@ -47,6 +77,7 @@ def resolve_h5ad(key: str) -> Path:
     return require_file(config.dataset(key)["h5ad"])
 
 
-def banner(script: str, key: str) -> None:
+def banner(script: str, key: str, chem: str | None = None) -> None:
     meta = config.dataset(key)
-    log(f"=== {script} | dataset={key} ({meta['label']})")
+    suffix = f" | chemistry={chem}" if chem else " | chemistry=pooled"
+    log(f"=== {script} | dataset={key}{suffix} ({meta['label']})")
