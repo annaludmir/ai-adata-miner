@@ -1,0 +1,29 @@
+# Fallback environment for ai-adata-miner.
+#
+# You probably do not need this. The pipeline's five dependencies are already
+# present in the existing /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new
+# (scanpy pulls in anndata and h5py), so AIM_ENV defaults there. Run
+# `bash running_scripts/check_env.sh` to confirm before building anything.
+#
+# Use this only if that check fails, or if you want the pipeline insulated from
+# changes to the shared scanpy environment.
+#
+#   module load mamba/mamba-1.5.8
+#   mamba env create -p /miridan-data/annaludmir/conda-envs/ai-adata-miner \
+#                    -f /miridan-data/annaludmir/ai-adata-miner/environment.yml
+#   AIM_ENV=/miridan-data/annaludmir/conda-envs/ai-adata-miner \
+#     bash running_scripts/check_env.sh
+#
+# Note what is absent: scanpy. The extraction layer reads h5ad through h5py and
+# anndata's read_elem and never builds an AnnData object, so scanpy and its
+# dependency tree are not needed. That keeps this env small and quick to solve.
+name: ai-adata-miner
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.24
+  - pandas>=2.0
+  - scipy>=1.10
+  - h5py>=3.8
+  - anndata>=0.9

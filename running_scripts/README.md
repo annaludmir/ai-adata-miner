@@ -5,7 +5,23 @@ Follows the conventions of `ndd_gene_modules/running_scripts/`: public pool,
 the `mamba-1.5.8` + `jupyter-scanpy_new` environment, and the EXIT-trap summary
 file from `python_cell_cycle_annotation.sh`.
 
-## First: a smoke test
+## Order of operations
+
+```bash
+cd /miridan-data/annaludmir/ai-adata-miner/running_scripts
+bash check_env.sh                                              # 1. is the env usable?  (~1 min)
+LIMIT_CELLS=20000 sbatch --export=ALL slurm_full_pipeline.sh   # 2. smoke test          (~minutes)
+./submit_all.sh                                                # 3. the full run        (hours)
+```
+
+## First: check the environment
+
+`check_env.sh` confirms the five required packages, resolves `anndata.read_elem`,
+imports the repo modules and opens both h5ad files. See
+[Creating the environment](#creating-the-environment) — in short, the existing
+`jupyter-scanpy_new` almost certainly already works and nothing needs building.
+
+## Then: a smoke test
 
 Same code path, 20k cells, minutes instead of hours. Do this before committing
 a 500G allocation for two days.
@@ -46,6 +62,7 @@ re-reads the matrix.
 
 | script | what it does |
 |---|---|
+| `check_env.sh` | verifies AIM_ENV and that both h5ad files open — run this first |
 | `submit_all.sh` | login-node orchestrator; submits the chain with `afterok` |
 | `slurm_01_metadata.sh` | stage 1 — obs/var/obsm only |
 | `slurm_02_pseudobulk.sh` | stage 2 — the single streaming pass over X |
@@ -95,3 +112,59 @@ TOP_GENES=20000 MAIL_SUMMARY=true ./submit_all.sh
 - **Resource figures are estimates, not measurements.** They were never run
   against the real files. Check `seff <jobid>` after the first real run and
   tune — in particular `--mem` for stage 2, which is the only one that matters.
+
+## Creating the environment
+
+`AIM_ENV` points at a mamba environment prefix. **You most likely do not need to
+create one.**
+
+### First, check the environment you already have
+
+`AIM_ENV` defaults to `/miridan-data/annaludmir/conda-envs/jupyter-scanpy_new`,
+the env the `ndd_gene_modules` jobs use. The pipeline needs exactly five
+packages — numpy, pandas, scipy, h5py, anndata — and that env already has them
+(scanpy depends on anndata and h5py). So the first step is to confirm, not to
+build:
+
+```bash
+cd /miridan-data/annaludmir/ai-adata-miner/running_scripts
+bash check_env.sh            # ~1 minute, light enough for the login node
+```
+
+It reports the five package versions, resolves `anndata.read_elem` (which has
+moved twice across versions — the pipeline handles all three locations), imports
+the repo's own modules, and then opens both h5ad files and reads their shape and
+`.obs`. It also tells you if the real files disagree with `schemas/`. If it ends
+in `READY`, submit jobs — there is nothing to create.
+
+### Only if that fails: build a dedicated env
+
+```bash
+module load mamba/mamba-1.5.8
+mamba env create -p /miridan-data/annaludmir/conda-envs/ai-adata-miner \
+                 -f /miridan-data/annaludmir/ai-adata-miner/environment.yml
+
+AIM_ENV=/miridan-data/annaludmir/conda-envs/ai-adata-miner bash check_env.sh
+```
+
+Then pass it to every job:
+
+```bash
+export AIM_ENV=/miridan-data/annaludmir/conda-envs/ai-adata-miner
+./submit_all.sh                                   # forwards AIM_ENV through the chain
+sbatch --export=ALL slurm_02_pseudobulk.sh        # or per job
+```
+
+Or edit the default in `_common.sh` once.
+
+This env is deliberately small: no scanpy. The extraction layer reads h5ad
+through h5py and `anndata.read_elem` and never constructs an AnnData object, so
+scanpy's dependency tree is not needed and the solve is quick.
+
+### Why a separate env might be worth it anyway
+
+The shared `jupyter-scanpy_new` carries pyscenic, pydeseq2, gseapy and a
+numpy-compat patch (`fix_pyscenic_numpy_compat.py`). Anything that upgrades
+numpy there to satisfy one of those can break the others. A dedicated env with
+five pinned packages removes this pipeline from that blast radius. Not urgent —
+just the reason you might choose to.
