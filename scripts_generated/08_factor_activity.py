@@ -10,7 +10,11 @@ Two diagnostics matter most:
     programme or a diffuse one shared by everything?
   * correlation with QC metrics -- a factor tracking total_UMIs or
     fraction_mitochondrial is a technical axis, not biology, and must not be
-    interpreted as a module.
+    interpreted as a module.  Cell-cycle and unspliced-fraction scores are
+    also correlated, but flagged separately: proliferation and maturation are
+    real biology in a developing brain, not artefacts.  Depth itself differs
+    by cell type (neurons carry more UMIs than progenitors), so the technical
+    flag is a prompt to check, not a verdict.
 
 Outputs (csv_exports/<dataset>/08_factor_activity/)
   factor_activity_<key>_by_<role>.csv  mean/median activity per group
@@ -44,6 +48,10 @@ MAX_LEVELS = 1000
 MAX_DIMS = 200
 CORR_SUBSAMPLE = 200_000
 TECHNICAL_R = 0.3
+# Only these QC roles mark an axis as technical; the rest are biological.
+TECHNICAL_ROLES = ["frac_mito", "n_genes", "total_umis", "total_rna",
+                   "doublet_score"]
+CYCLE_ROLES = ["cell_cycle_score", "cycling_score", "cc_g1", "cc_s", "cc_g2m"]
 
 
 def run(key: str, args, chem: str | None = None,
@@ -168,15 +176,26 @@ def run(key: str, args, chem: str | None = None,
             if qc_cols and fac_cols:
                 block = full.loc[fac_cols, qc_cols].copy()
                 block["max_abs_qc_correlation"] = block[qc_cols].abs().max(axis=1)
-                block["likely_technical"] = block["max_abs_qc_correlation"] > TECHNICAL_R
+                tech = [c for c in qc_cols if c in TECHNICAL_ROLES]
+                cyc = [c for c in qc_cols if c in CYCLE_ROLES]
+                block["max_abs_technical_correlation"] = (
+                    block[tech].abs().max(axis=1) if tech else np.nan)
+                block["likely_technical"] = block["max_abs_technical_correlation"] > TECHNICAL_R
+                block["tracks_cell_cycle"] = (
+                    block[cyc].abs().max(axis=1) > TECHNICAL_R if cyc else False)
                 block.index.name = "factor"
                 man.write(block.reset_index(), f"factor_qc_correlation_{ekey}",
                           f"Correlation of each {ekey} dimension with QC metrics; "
-                          f"|r|>{TECHNICAL_R} flagged as likely technical",
+                          f"likely_technical = |r|>{TECHNICAL_R} with depth/mito/"
+                          "doublet metrics; tracks_cell_cycle flagged separately "
+                          "(biology, not artefact)",
                           subdir=SUBDIR)
                 n_tech = int(block["likely_technical"].sum())
                 if n_tech:
                     log(f"    {n_tech}/{len(fac_cols)} {ekey} dims flagged as likely technical")
+                n_cyc = int(block["tracks_cell_cycle"].sum())
+                if n_cyc:
+                    log(f"    {n_cyc}/{len(fac_cols)} {ekey} dims track the cell cycle")
     man.flush()
 
 

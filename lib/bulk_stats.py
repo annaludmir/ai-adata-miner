@@ -328,27 +328,62 @@ def gsea_enrichment_score(ranked_genes: list[str], gene_set: set[str],
     return es, running, leading
 
 
+def _null_es(n: int, size: int, weights, n_permutations: int, seed: int,
+             chunk: int = 250) -> np.ndarray:
+    """ES of `n_permutations` random sets of `size` genes, vectorised.
+
+    Draws the same random sets as calling gsea_enrichment_score once per
+    permutation with rng.choice(universe, size, replace=False), so results are
+    identical to the per-permutation loop -- just without the Python overhead.
+    """
+    rng = np.random.default_rng(seed)
+    w = np.ones(n) if weights is None else np.abs(np.asarray(weights, dtype=float))
+    out = np.empty(n_permutations)
+    for start in range(0, n_permutations, chunk):
+        m = min(chunk, n_permutations - start)
+        hits = np.zeros((m, n), dtype=bool)
+        for r in range(m):
+            hits[r, rng.choice(n, size=size, replace=False)] = True
+        hit_w = np.where(hits, w, 0.0)
+        total = hit_w.sum(axis=1, keepdims=True)
+        # Sets whose members all carry zero weight fall back to unweighted.
+        zero = (total <= 0).ravel()
+        if zero.any():
+            hit_w[zero] = hits[zero]
+            total[zero] = size
+        running = np.cumsum(hit_w, axis=1) / total - np.cumsum(~hits, axis=1) / (n - size)
+        peak = np.argmax(np.abs(running), axis=1)
+        out[start:start + m] = running[np.arange(m), peak]
+    return out
+
+
 def gsea_test(ranked_genes: list[str], gene_set: set[str], weights=None,
-              n_permutations: int = 1000, seed: int = 0) -> dict:
+              n_permutations: int = 1000, seed: int = 0,
+              null_cache: dict | None = None) -> dict:
     """GSEA with a gene-set permutation null, as described in the course notes.
 
     Random sets of the same size give the null distribution of ES. Note the
     caveat: permuting gene *sets* (not sample labels) does not preserve
     gene-gene correlation, so the p-value is anti-conservative for correlated
     sets. It ranks hypotheses well; treat the absolute value with care.
+
+    The null depends only on (ranking weights, set size, seed), so callers
+    testing many sets against one ranking can pass a dict as `null_cache` and
+    reuse it; the cache must be fresh for every new ranking.
     """
     es, running, leading = gsea_enrichment_score(ranked_genes, gene_set, weights)
     if not np.isfinite(es):
         return {"es": np.nan, "nes": np.nan, "p_value": np.nan,
                 "n_genes_in_set": 0, "leading_edge": [], "peak_rank": np.nan}
-    rng = np.random.default_rng(seed)
-    universe = np.asarray(ranked_genes)
+    n = len(ranked_genes)
     size = sum(1 for g in ranked_genes if g in gene_set)
-    null = np.empty(n_permutations)
-    for i in range(n_permutations):
-        rand_set = set(rng.choice(universe, size=size, replace=False).tolist())
-        null[i], _, _ = gsea_enrichment_score(ranked_genes, rand_set, weights)
-    null = null[np.isfinite(null)]
+    if null_cache is not None and size in null_cache:
+        null = null_cache[size]
+    else:
+        null = _null_es(n, size, weights, n_permutations, seed)
+        null = null[np.isfinite(null)]
+        if null_cache is not None:
+            null_cache[size] = null
     if null.size == 0:
         return {"es": es, "nes": np.nan, "p_value": np.nan,
                 "n_genes_in_set": size, "leading_edge": leading,

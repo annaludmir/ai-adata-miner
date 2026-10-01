@@ -86,6 +86,7 @@ def run(key: str, args, chem: str | None = None,
             order = np.argsort(-score)
             ranked = spec["gene"].astype(str).to_numpy()[order].tolist()
             weights = np.abs(score[order])
+            null_cache: dict = {}  # null depends on this ranking only
 
             for (pgroup, pname), g in panels.groupby(["panel_group", "panel"]):
                 members = set(g["gene"]) & set(ranked)
@@ -93,7 +94,8 @@ def run(key: str, args, chem: str | None = None,
                     continue
                 res = gsea_test(ranked, members, weights=weights,
                                 n_permutations=N_PERMUTATIONS,
-                                seed=config.RANDOM_SEED)
+                                seed=config.RANDOM_SEED,
+                                null_cache=null_cache)
                 if not np.isfinite(res["es"]):
                     continue
                 results.append({
