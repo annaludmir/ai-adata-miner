@@ -57,10 +57,12 @@ def describe_frame(df: pd.DataFrame, kind: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
     path = cli.resolve_h5ad(key)
-    man = Manifest(key, SCRIPT)
+    man = Manifest(ns, SCRIPT)
     meta = config.dataset(key)
 
     log("reading .obs (no X touched)...")
@@ -132,8 +134,10 @@ def run(key: str, args) -> None:
 
 def main() -> None:
     args = cli.build_parser(__doc__).parse_args()
+    if getattr(args, "chemistry", "all") != "all":
+        log("  (this step describes the file as a whole; chemistry split not applied)")
     for key in cli.selected_datasets(args):
-        run(key, args)
+        run(key, args, None, key)
 
 
 if __name__ == "__main__":

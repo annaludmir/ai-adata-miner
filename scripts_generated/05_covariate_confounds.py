@@ -31,7 +31,7 @@ import pandas as pd
 import config
 from lib import cli
 from lib.aggregate import contingency
-from lib.io_utils import (Manifest, add_derived_obs_columns, log, read_obs,
+from lib.io_utils import (Manifest, load_obs, log,
                           resolve_cluster_columns, resolve_qc_frame, resolve_role)
 from lib.stats_utils import cramers_v, eta_squared
 
@@ -47,16 +47,23 @@ MAX_LEVELS = 400
 STRONG_V = 0.5
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
     path = cli.resolve_h5ad(key)
-    man = Manifest(key, SCRIPT)
+    man = Manifest(ns, SCRIPT)
 
-    obs = read_obs(path)
-    if args.limit_cells:
-        obs = obs.iloc[:args.limit_cells]
-        log(f"  LIMITED to first {len(obs):,} cells (smoke test)")
-    obs = add_derived_obs_columns(obs, key)
+    obs, _keep = load_obs(path, key, chem, args.limit_cells)
+    if obs is None:
+        log(f"  no chemistry column in this file -- cannot run chemistry={chem}; skipping")
+        man.flush()
+        return
+    if len(obs) == 0:
+        log(f"  no cells with chemistry={chem}; skipping")
+        man.flush()
+        return
+    log(f"  {len(obs):,} cells after chemistry filter ({chem or 'pooled'})")
     qc = resolve_qc_frame(obs)
 
     covars: dict[str, pd.Series] = {}
@@ -149,8 +156,8 @@ def run(key: str, args) -> None:
 
 def main() -> None:
     args = cli.build_parser(__doc__).parse_args()
-    for key in cli.selected_datasets(args):
-        run(key, args)
+    for key, chem, ns in cli.dataset_variants(args):
+        run(key, args, chem, ns)
 
 
 if __name__ == "__main__":

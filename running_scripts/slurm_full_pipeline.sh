@@ -51,5 +51,6 @@ aim_run 14_normalization_diagnostics
 aim_run 15_sample_relationships
 aim_run 16_expression_patterns
 aim_run 17_gsea_panels
+aim_run 18_chemistry_comparability
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1

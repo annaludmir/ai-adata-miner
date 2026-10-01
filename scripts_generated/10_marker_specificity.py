@@ -50,10 +50,12 @@ def load_matrix(path: Path) -> pd.DataFrame:
     return df.apply(pd.to_numeric, errors="coerce")
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
-    man = Manifest(key, SCRIPT)
-    pb_dir = config.CSV_EXPORTS / key / "09_pseudobulk"
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
+    man = Manifest(ns, SCRIPT)
+    pb_dir = config.CSV_EXPORTS / ns / "09_pseudobulk"
     if not pb_dir.exists():
         log(f"  {pb_dir} not found -- run 09_pseudobulk.py first")
         man.flush()
@@ -154,8 +156,8 @@ def run(key: str, args) -> None:
 
 def main() -> None:
     args = cli.build_parser(__doc__).parse_args()
-    for key in cli.selected_datasets(args):
-        run(key, args)
+    for key, chem, ns in cli.dataset_variants(args):
+        run(key, args, chem, ns)
 
 
 if __name__ == "__main__":

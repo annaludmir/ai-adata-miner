@@ -45,6 +45,8 @@ def main() -> None:
         log("cross-dataset comparison needs both datasets; run with --dataset all")
         return
 
+    if getattr(args, "chemistry", "all") != "all":
+        log("  (gene-id and label maps are chemistry-independent; running pooled)")
     man = Manifest(CROSS_KEY, SCRIPT)
     frames, labels = {}, {}
     for key in keys:

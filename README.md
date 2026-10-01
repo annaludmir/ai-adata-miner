@@ -27,6 +27,12 @@ docs/               ANALYSIS_CATALOG.md -- what is extracted and what is possibl
 Paths resolve through `config.py`; override with `AI_ADATA_DATA_ROOT` and
 `AI_ADATA_OUT_ROOT`.
 
+Both datasets mix 10x **v2 and v3 chemistry**, which in `human_dev` is nearly
+confounded with age (v2 ~6–10 pcw, v3 ~5–5.5 and 11.5–14). Analyses therefore
+run **per chemistry by default**, into `csv_exports/<dataset>__v2/` and
+`__v3/`; `--chemistry all` pools them instead. Script 18 measures what the
+stratification costs — read it before interpreting anything.
+
 ## Running
 
 ```bash

@@ -45,10 +45,12 @@ MAX_GROUPS = 60
 TOP_CURVES = 10
 
 
-def run(key: str, args) -> None:
-    cli.banner(SCRIPT, key)
-    man = Manifest(key, SCRIPT)
-    mk = config.CSV_EXPORTS / key / "10_markers"
+def run(key: str, args, chem: str | None = None,
+        ns: str | None = None) -> None:
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
+    man = Manifest(ns, SCRIPT)
+    mk = config.CSV_EXPORTS / ns / "10_markers"
     if not mk.exists():
         log(f"  {mk} not found -- run 10_marker_specificity.py first")
         man.flush()
@@ -164,8 +166,8 @@ def run(key: str, args) -> None:
 
 def main() -> None:
     args = cli.build_parser(__doc__).parse_args()
-    for key in cli.selected_datasets(args):
-        run(key, args)
+    for key, chem, ns in cli.dataset_variants(args):
+        run(key, args, chem, ns)
 
 
 if __name__ == "__main__":

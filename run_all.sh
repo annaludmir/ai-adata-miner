@@ -4,6 +4,8 @@
 #   ./run_all.sh                     # everything, both datasets
 #   ./run_all.sh --dataset cortex    # one dataset
 #   ./run_all.sh --limit-cells 20000 # smoke test on a slice first (recommended)
+#   ./run_all.sh --chemistry all     # pool v2+v3 (default is to run each apart)
+#   TOP_GENES=20000 ./run_all.sh     # env var: only step 09 accepts --top-genes
 #
 # Scripts 00-08 and 13 read only .obs/.var/.obsm/.varm and finish in minutes.
 # Script 09 streams X and is the long one; 10-11 then work purely on its CSVs.
@@ -32,6 +34,7 @@ ORDER=(
   15_sample_relationships      # correlation / hierarchical clustering / PCA
   16_expression_patterns       # Z-scored K-means expression patterns
   17_gsea_panels               # GSEA of the panels, reads 10's CSVs
+  18_chemistry_comparability   # pooled by design: what survives stratification
 )
 
 mkdir -p logs
@@ -41,7 +44,13 @@ for script in "${ORDER[@]}"; do
   echo "=============================================================="
   echo ">>> ${script}"
   echo "=============================================================="
-  if "$PYTHON" "scripts_generated/${script}.py" "${ARGS[@]}" 2>&1 | tee "logs/${script}.log"; then
+  # --top-genes is only accepted by 09; passing it to the others is an error,
+  # so it is added per script rather than forwarded blindly.
+  STEP_ARGS=("${ARGS[@]}")
+  if [[ "$script" == 09_* && -n "${TOP_GENES:-}" ]]; then
+    STEP_ARGS+=(--top-genes "$TOP_GENES")
+  fi
+  if "$PYTHON" "scripts_generated/${script}.py" "${STEP_ARGS[@]}" 2>&1 | tee "logs/${script}.log"; then
     echo "--- ${script} OK"
   else
     echo "!!! ${script} FAILED (see logs/${script}.log) -- continuing"
