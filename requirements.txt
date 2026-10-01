@@ -1,0 +1,8 @@
+# Extraction layer (steps 1 & 2) -- deliberately no scanpy.
+# Nothing here needs a full AnnData in memory; h5py + anndata's read_elem are
+# enough, which keeps the 1.67M-cell file streamable on a modest machine.
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+h5py>=3.8
+anndata>=0.9

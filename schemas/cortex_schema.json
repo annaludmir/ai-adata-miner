@@ -1,0 +1,1049 @@
+{
+  "n_obs": 297927,
+  "n_vars": 33538,
+  "obs_index": {
+    "name": "CellID",
+    "sample_values": [
+      "10X298_1:TGTGATGGTCCAGCAC",
+      "10X298_1:ATGCATGGTTAAAGTG",
+      "10X298_1:TTGGGCGTCACGTAGT",
+      "10X298_1:TACGCTCTCCCGAGGT",
+      "10X298_1:TTGCCTGCAAGTTGGG"
+    ]
+  },
+  "var_index": {
+    "name": "Gene",
+    "sample_values": [
+      "CFAP52",
+      "TP73",
+      "LHX1",
+      "CFAP126",
+      "BHMT"
+    ]
+  },
+  "obs": {
+    "Age": {
+      "dtype": "float64",
+      "n_unique": 13,
+      "has_missing": false,
+      "categories": [
+        "5.5",
+        "5.0",
+        "6.9",
+        "7.5",
+        "8.5",
+        "8.0",
+        "9.2",
+        "9.5",
+        "10.0",
+        "11.5",
+        "12.0",
+        "13.25",
+        "14.0"
+      ]
+    },
+    "Agetext": {
+      "dtype": "category",
+      "n_unique": 13,
+      "has_missing": false,
+      "categories": [
+        "5.5w",
+        "5w",
+        "6.9w",
+        "7.5w",
+        "8.5w",
+        "8w",
+        "9.2w",
+        "9.5w",
+        "10w",
+        "11.5w",
+        "12w",
+        "13-13.5w",
+        "14w"
+      ]
+    },
+    "Ageunit": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "pcw"
+      ]
+    },
+    "All_fc_analysis_id": {
+      "dtype": "int64",
+      "n_unique": 81,
+      "has_missing": false,
+      "sample_values": [
+        "4624",
+        "2701",
+        "4625",
+        "3666",
+        "3664"
+      ]
+    },
+    "Analysis": {
+      "dtype": "category",
+      "n_unique": 27,
+      "has_missing": false,
+      "categories": [
+        "Queueing",
+        "Ready (10X111_2_GRCh38-3_0_0)",
+        "Ready (10X112_1_GRCh38-3_0_0)",
+        "Ready (10X112_2_GRCh38-3_0_0)",
+        "Ready (10X111_1_GRCh38-3_0_0)",
+        "Ready (10X115_2_GRCh38-3_0_0)",
+        "Ready (10X114_1_GRCh38-3_0_0)",
+        "Ready (10X115_3_GRCh38-3_0_0)",
+        "Ready (10X115_1_GRCh38-3_0_0)",
+        "Ready (10X92_1_GRCh38-3_0_0)",
+        "Ready (10X114_4_GRCh38-3_0_0)",
+        "Ready (10X114_3_GRCh38-3_0_0)",
+        "Ready (10X115_6_GRCh38-3_0_0)",
+        "Ready (10X115_5_GRCh38-3_0_0)",
+        "Ready (10X101_2_GRCh38-3_0_0)",
+        "Ready (10X101_1_GRCh38-3_0_0)",
+        "Ready (10X101_4_GRCh38-3_0_0)",
+        "Ready (10X101_7_GRCh38-3_0_0)",
+        "Ready (10X101_8_GRCh38-3_0_0)",
+        "Ready (10X102_6_GRCh38-3_0_0)"
+      ]
+    },
+    "CellCycle": {
+      "dtype": "float64",
+      "n_unique": 195579,
+      "has_missing": false,
+      "sample_values": [
+        "0.0020367981533030077",
+        "0.002891566265060241",
+        "0.002669717772692601",
+        "0.003317157073530315",
+        "0.004387889425186486"
+      ]
+    },
+    "CellCycle_G1": {
+      "dtype": "float64",
+      "n_unique": 138126,
+      "has_missing": false,
+      "sample_values": [
+        "0.0005431461742141354",
+        "0.001285140562248996",
+        "0.00019069412662090009",
+        "0.0011671478592051108",
+        "0.000767880649407635"
+      ]
+    },
+    "CellCycle_G2M": {
+      "dtype": "float64",
+      "n_unique": 152095,
+      "has_missing": false,
+      "sample_values": [
+        "0.0013578654355353385",
+        "0.0015261044176706827",
+        "0.002383676582761251",
+        "0.0016585785367651575",
+        "0.0035103115401491883"
+      ]
+    },
+    "CellCycle_S": {
+      "dtype": "float64",
+      "n_unique": 91340,
+      "has_missing": false,
+      "sample_values": [
+        "0.00013578654355353385",
+        "8.032128514056225e-05",
+        "9.534706331045004e-05",
+        "0.0004914306775600466",
+        "0.00010969723562966213"
+      ]
+    },
+    "Cellconc": {
+      "dtype": "category",
+      "n_unique": 17,
+      "has_missing": false,
+      "categories": [
+        "1240",
+        "1270",
+        "900",
+        "560",
+        "590",
+        "800",
+        "1000",
+        "",
+        "600",
+        "3000",
+        "3200",
+        "1130",
+        "1850",
+        "1110",
+        "1160",
+        "980",
+        "770"
+      ]
+    },
+    "Chemistry": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "v3",
+        "v2"
+      ]
+    },
+    "Clusters": {
+      "dtype": "int64",
+      "n_unique": 55,
+      "has_missing": false,
+      "sample_values": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    },
+    "ClustersModularity": {
+      "dtype": "int64",
+      "n_unique": 55,
+      "has_missing": false,
+      "sample_values": [
+        "0",
+        "1",
+        "2",
+        "7",
+        "3"
+      ]
+    },
+    "ClustersSurprise": {
+      "dtype": "int64",
+      "n_unique": 950,
+      "has_missing": false,
+      "sample_values": [
+        "0",
+        "10",
+        "35",
+        "7",
+        "27"
+      ]
+    },
+    "Cmobarcodes": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        ""
+      ]
+    },
+    "Comment": {
+      "dtype": "category",
+      "n_unique": 11,
+      "has_missing": false,
+      "categories": [
+        "",
+        "Cortex a bit destroyed, no image was taken of the tissue piece before dissociation.",
+        "Cortex a bit destroyed, no image was taken of the tissue piece before dissociation. ",
+        "Were loaded on separate chip, approx. 30-45 min after first chip, cells were still viable. ",
+        "Were loaded on separate chip, approx. 30-45 min after first chip, cells were still viable.",
+        "Forebrain from one hemisphere.",
+        "Forebrain from one hemisphere. ",
+        "Cell concentration was mis-calculated. Twice as much cells loaded, forgot to account for Tryptan blue dilution.",
+        "sample was the same as 10X187 and loaded in second chip.",
+        "First half of cortex",
+        "Second half of cortex"
+      ]
+    },
+    "CreationDate": {
+      "dtype": "category",
+      "n_unique": 81,
+      "has_missing": false,
+      "categories": [
+        "20210115T042513.331008Z",
+        "20190620T134418.659636Z",
+        "20210115T075201.090706Z",
+        "20200404T022809.758873Z",
+        "20200404T213500.782738Z",
+        "20200404T042142.550059Z",
+        "20190604T112335.683507Z",
+        "20200905T193000.431614Z",
+        "20200402T220126.430288Z",
+        "20200410T073900.799690Z",
+        "20190414T210203.236255Z",
+        "20190415T155149.343928Z",
+        "20190415T194128.358462Z",
+        "20190415T021318.682397Z",
+        "20190116T031057.347053Z",
+        "20190116T172049.056041Z",
+        "20190117T095116.098526Z",
+        "20190109T220301.716294Z",
+        "20190417T035807.239073Z",
+        "20190416T143004.455078Z"
+      ]
+    },
+    "Datecaptured": {
+      "dtype": "category",
+      "n_unique": 15,
+      "has_missing": false,
+      "categories": [
+        "2020-10-21",
+        "2019-04-23",
+        "2019-02-15",
+        "2019-06-05",
+        "2018-09-07",
+        "2018-06-08",
+        "2018-10-02",
+        "2017-11-10",
+        "2018-06-14",
+        "2017-12-14",
+        "2018-03-29",
+        "2019-06-19",
+        "2019-05-10",
+        "2019-06-28",
+        "2020-03-04"
+      ]
+    },
+    "Donor": {
+      "dtype": "category",
+      "n_unique": 15,
+      "has_missing": false,
+      "categories": [
+        "XDD:400",
+        "XDD:348",
+        "BRC2061",
+        "BRC2191",
+        "BRC2114",
+        "XHU:0542:305",
+        "XDD:3766:313",
+        "BRC2006",
+        "XHU:1966:307",
+        "XHU:4901:292",
+        "XHU:1405:297",
+        "XDD:358",
+        "XDD:351",
+        "XDD:359",
+        "XDD:385"
+      ]
+    },
+    "DoubletFinderFlag": {
+      "dtype": "int64",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "0"
+      ]
+    },
+    "DoubletFinderScore": {
+      "dtype": "float64",
+      "n_unique": 105,
+      "has_missing": false,
+      "sample_values": [
+        "0.08",
+        "0.06",
+        "0.16",
+        "0.15",
+        "0.22"
+      ]
+    },
+    "Editat": {
+      "dtype": "category",
+      "n_unique": 81,
+      "has_missing": false,
+      "categories": [
+        "2020-11-13 16:54:52",
+        "2019-06-03 11:02:52",
+        "2020-11-13 16:57:25",
+        "2019-06-03 11:00:30",
+        "2019-06-03 10:59:19",
+        "2019-06-03 11:00:17",
+        "2019-05-31 17:08:26",
+        "2019-06-25 13:10:15",
+        "2019-05-31 17:07:47",
+        "2019-06-25 13:10:28",
+        "2019-05-31 15:51:21",
+        "2019-05-31 15:56:30",
+        "2019-05-31 15:56:07",
+        "2019-05-31 15:51:39",
+        "2019-11-13 10:58:24",
+        "2019-11-13 10:58:01",
+        "2019-11-13 10:58:35",
+        "2019-11-13 10:57:48",
+        "2019-11-13 10:38:34",
+        "2019-11-13 10:39:47"
+      ]
+    },
+    "Editby": {
+      "dtype": "category",
+      "n_unique": 3,
+      "has_missing": false,
+      "categories": [
+        "lijuan",
+        "emelie",
+        "kimberly"
+      ]
+    },
+    "Id": {
+      "dtype": "int64",
+      "n_unique": 81,
+      "has_missing": false,
+      "sample_values": [
+        "1494",
+        "840",
+        "1495",
+        "839",
+        "837"
+      ]
+    },
+    "IsCycling": {
+      "dtype": "uint8",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "Label": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "",
+        "BRC 2006"
+      ]
+    },
+    "MT_ratio": {
+      "dtype": "float64",
+      "n_unique": 217304,
+      "has_missing": false,
+      "sample_values": [
+        "0.03218141082218752",
+        "0.015421686746987951",
+        "0.05453852021357742",
+        "0.03980588488236378",
+        "0.0799692847740237"
+      ]
+    },
+    "MeanTotalUMI": {
+      "dtype": "float64",
+      "n_unique": 81,
+      "has_missing": false,
+      "sample_values": [
+        "1.1000680453370193",
+        "0.5568244244749038",
+        "0.949486341505971",
+        "1.1229000855197857",
+        "1.2487637262425793"
+      ]
+    },
+    "Method": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "rna-seq"
+      ]
+    },
+    "NGenes": {
+      "dtype": "float64",
+      "n_unique": 6711,
+      "has_missing": false,
+      "sample_values": [
+        "5133.0",
+        "4465.0",
+        "3849.0",
+        "5475.0",
+        "3717.0"
+      ]
+    },
+    "Name": {
+      "dtype": "category",
+      "n_unique": 81,
+      "has_missing": false,
+      "categories": [
+        "10X298_1",
+        "10X178_1",
+        "10X298_2",
+        "10X177_6",
+        "10X177_4",
+        "10X177_5",
+        "10X167_2",
+        "10X200_1",
+        "10X167_1",
+        "10X200_2",
+        "10X124_3",
+        "10X125_4",
+        "10X125_3",
+        "10X124_4",
+        "10X111_2",
+        "10X112_1",
+        "10X112_2",
+        "10X111_1",
+        "10X132_7",
+        "10X132_1"
+      ]
+    },
+    "Neuronprop": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "N/A"
+      ]
+    },
+    "Numpooledanimals": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        ""
+      ]
+    },
+    "Outliers": {
+      "dtype": "int64",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "0"
+      ]
+    },
+    "OutliersModularity": {
+      "dtype": "int64",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "0"
+      ]
+    },
+    "OutliersSurprise": {
+      "dtype": "int64",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "0"
+      ]
+    },
+    "PassedQC": {
+      "dtype": "uint8",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "PassedQC_MT_ratio": {
+      "dtype": "uint8",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "PassedQC_TotalUMI": {
+      "dtype": "uint8",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "PassedQC_UMIPerGene": {
+      "dtype": "uint8",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "PassedQC_UnsplicedRatio": {
+      "dtype": "uint8",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "Plugdate": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        ""
+      ]
+    },
+    "Project": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "Dev human"
+      ]
+    },
+    "Roi": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        ""
+      ]
+    },
+    "SampleID": {
+      "dtype": "category",
+      "n_unique": 81,
+      "has_missing": false,
+      "categories": [
+        "10X298_1",
+        "10X178_1",
+        "10X298_2",
+        "10X177_6",
+        "10X177_4",
+        "10X177_5",
+        "10X167_2",
+        "10X200_1",
+        "10X167_1",
+        "10X200_2",
+        "10X124_3",
+        "10X125_4",
+        "10X125_3",
+        "10X124_4",
+        "10X111_2",
+        "10X112_1",
+        "10X112_2",
+        "10X111_1",
+        "10X132_7",
+        "10X132_1"
+      ]
+    },
+    "Sampleok": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "N/A",
+        "Y"
+      ]
+    },
+    "Sex": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        ""
+      ]
+    },
+    "Shortname": {
+      "dtype": "category",
+      "n_unique": 24,
+      "has_missing": false,
+      "categories": [
+        "XDD:400_Forebrain",
+        "XDD:348_Forebrain",
+        "BRC2061_Cortex",
+        "BRC2191_Cortex",
+        "BRC2191_Cortical_hem",
+        "BRC2114_Cortex",
+        "XHU:0542:305_Forebrain",
+        "XDD:3766:313_Forebrain",
+        "BRC2006_Cortex",
+        "XHU:1966:307_Cortex",
+        "XHU:4901:292_Forebrain_cortex",
+        "XHU:1966:307_Forebrain",
+        "XHU:1405:297_Cortex",
+        "XHU:1405:297_Forebrain",
+        "XDD:358_Lower_cortex",
+        "XDD:358_Upper_cortex",
+        "XDD:358_Frontotemporal_cortex",
+        "XDD:358_Occipital_cortex",
+        "XDD:351_Cortex",
+        "XDD:351_Enthorinal_cortex"
+      ]
+    },
+    "Species": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "Hs"
+      ]
+    },
+    "Strain": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        ""
+      ]
+    },
+    "Subset": {
+      "dtype": "category",
+      "n_unique": 10,
+      "has_missing": false,
+      "categories": [
+        "5wk",
+        "6wk",
+        "7wk",
+        "8wk",
+        "9wk",
+        "10wk",
+        "11wk",
+        "12wk",
+        "13wk",
+        "14wk"
+      ]
+    },
+    "Targetnumcells": {
+      "dtype": "category",
+      "n_unique": 4,
+      "has_missing": false,
+      "categories": [
+        "5000",
+        "4000",
+        "8000",
+        ""
+      ]
+    },
+    "Tissue": {
+      "dtype": "category",
+      "n_unique": 9,
+      "has_missing": false,
+      "categories": [
+        "Forebrain",
+        "Cortex",
+        "Cortical hem",
+        "Forebrain cortex",
+        "Lower cortex",
+        "Upper cortex",
+        "Frontotemporal cortex",
+        "Occipital cortex",
+        "Enthorinal cortex"
+      ]
+    },
+    "TotalRNA": {
+      "dtype": "float64",
+      "n_unique": 6675,
+      "has_missing": false,
+      "sample_values": [
+        "0.0",
+        "6034.0",
+        "7310.0",
+        "9336.0",
+        "4242.0"
+      ]
+    },
+    "TotalUMI": {
+      "dtype": "float64",
+      "n_unique": 25264,
+      "has_missing": false,
+      "sample_values": [
+        "14729.0",
+        "12450.0",
+        "10488.0",
+        "16279.0",
+        "9116.0"
+      ]
+    },
+    "Transcriptome": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "GRCh38-3.0.0"
+      ]
+    },
+    "_X": {
+      "dtype": "float32",
+      "n_unique": 297290,
+      "has_missing": false,
+      "sample_values": [
+        "35.0147590637207",
+        "27.997697830200195",
+        "25.826059341430664",
+        "2.9278383255004883",
+        "41.011962890625"
+      ]
+    },
+    "_Y": {
+      "dtype": "float32",
+      "n_unique": 297241,
+      "has_missing": false,
+      "sample_values": [
+        "3.691617250442505",
+        "44.88283920288086",
+        "-35.372718811035156",
+        "-23.198436737060547",
+        "-16.3884334564209"
+      ]
+    },
+    "passedQC": {
+      "dtype": "uint8",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "1"
+      ]
+    },
+    "unspliced_ratio": {
+      "dtype": "float64",
+      "n_unique": 280543,
+      "has_missing": false,
+      "sample_values": [
+        "0.3017176997759522",
+        "0.2869879518072289",
+        "0.2379862700228833",
+        "0.2744640334172861",
+        "0.2566915313734094"
+      ]
+    },
+    "velocyto.__version__": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0.17.17",
+        "0.17.11"
+      ]
+    },
+    "velocyto.logic": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "Default"
+      ]
+    },
+    "batch": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "_scvi_batch": {
+      "dtype": "int8",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "0"
+      ]
+    },
+    "_scvi_labels": {
+      "dtype": "int8",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "0"
+      ]
+    },
+    "leiden_scVI": {
+      "dtype": "category",
+      "n_unique": 13,
+      "has_missing": false,
+      "categories": [
+        "9",
+        "4",
+        "7",
+        "6",
+        "2",
+        "5",
+        "0",
+        "3",
+        "8",
+        "10",
+        "1",
+        "12",
+        "11"
+      ]
+    },
+    "louvain": {
+      "dtype": "category",
+      "n_unique": 7,
+      "has_missing": false,
+      "categories": [
+        "6",
+        "0",
+        "4",
+        "1",
+        "3",
+        "5",
+        "2"
+      ]
+    },
+    "classes": {
+      "dtype": "category",
+      "n_unique": 4,
+      "has_missing": false,
+      "categories": [
+        "Neuroblast",
+        "Neuronal IPC",
+        "Radial glia",
+        "Neuron"
+      ]
+    },
+    "mark": {
+      "dtype": "int64",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "0",
+        "1"
+      ]
+    },
+    "CellID": {
+      "dtype": "object",
+      "n_unique": 297927,
+      "has_missing": false,
+      "sample_values": [
+        "10X298_1:TGTGATGGTCCAGCAC",
+        "10X298_1:ATGCATGGTTAAAGTG",
+        "10X298_1:TTGGGCGTCACGTAGT",
+        "10X298_1:TACGCTCTCCCGAGGT",
+        "10X298_1:TTGCCTGCAAGTTGGG"
+      ]
+    },
+    "CellCycleFraction": {
+      "dtype": "float32",
+      "n_unique": 187711,
+      "has_missing": false,
+      "sample_values": [
+        "0.0016635969514027238",
+        "0.002593397395685315",
+        "0.0023387905675917864",
+        "0.003121748100966215",
+        "0.0038774351123720407"
+      ]
+    },
+    "Cycling": {
+      "dtype": "bool",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        false,
+        true
+      ]
+    },
+    "CellCyclePhase": {
+      "dtype": "category",
+      "n_unique": 5,
+      "has_missing": false,
+      "categories": [
+        "Non-cycling",
+        "PostM",
+        "S",
+        "G1",
+        "G2M"
+      ]
+    },
+    "CellClass": {
+      "dtype": "category",
+      "n_unique": 5,
+      "has_missing": false,
+      "categories": [
+        "Neuroblast",
+        "Radial glia",
+        "Neuronal IPC",
+        "Neuron",
+        "Glioblast"
+      ]
+    }
+  },
+  "var": {
+    "Chromosome": {
+      "dtype": "category",
+      "n_unique": 40,
+      "has_missing": false,
+      "categories": [
+        "17",
+        "1",
+        "5",
+        "4",
+        "6",
+        "11",
+        "8",
+        "15",
+        "2",
+        "7",
+        "12",
+        "20",
+        "3",
+        "X",
+        "9",
+        "16",
+        "22",
+        "14",
+        "10",
+        "18"
+      ]
+    },
+    "Accession": {
+      "dtype": "object",
+      "n_unique": 33538,
+      "has_missing": false,
+      "sample_values": [
+        "ENSG00000166596",
+        "ENSG00000078900",
+        "ENSG00000273706",
+        "ENSG00000188931",
+        "ENSG00000145692"
+      ]
+    },
+    "Start": {
+      "dtype": "int64",
+      "n_unique": 33465,
+      "has_missing": false,
+      "sample_values": [
+        "9576627",
+        "3652520",
+        "36936785",
+        "161364731",
+        "79111779"
+      ]
+    },
+    "End": {
+      "dtype": "int64",
+      "n_unique": 33423,
+      "has_missing": false,
+      "sample_values": [
+        "9643459",
+        "3736201",
+        "36944612",
+        "161367874",
+        "79132290"
+      ]
+    }
+  },
+  "obsm_keys": [
+    "PCA",
+    "TSNE",
+    "UMAP",
+    "UMAP3D",
+    "X_scVI",
+    "X_umap",
+    "nhoods"
+  ],
+  "varm_keys": [],
+  "uns_keys": [
+    "CellCyclePhase_colors",
+    "CellCycle_phase_colors",
+    "_scvi_manager_uuid",
+    "_scvi_uuid",
+    "leiden",
+    "leiden_scVI_colors",
+    "louvain",
+    "louvain_colors",
+    "neighbors",
+    "new_classes_colors",
+    "try_colors",
+    "umap"
+  ],
+  "layers": [
+    "ambiguous",
+    "matrix",
+    "spliced",
+    "unspliced"
+  ]
+}

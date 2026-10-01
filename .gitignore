@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv*/
+logs/
+# Exported CSVs are regenerable from the h5ad files; the manifest and the
+# observed schemas are small and worth versioning.
+csv_exports/**/*.csv
+!csv_exports/**/_manifest.csv
+*.h5ad
+.DS_Store

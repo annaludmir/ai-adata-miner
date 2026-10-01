@@ -1,0 +1,635 @@
+{
+  "n_obs": 1665937,
+  "n_vars": 59459,
+  "obs_index": {
+    "name": "CellID",
+    "sample_values": [
+      "10X89_1:AAACGGGAGGCTACGA",
+      "10X89_1:ACGAGGAAGAGCCTAG",
+      "10X89_1:ACGCCAGTCGATAGAA",
+      "10X89_1:CCGGGATCAGACACTT",
+      "10X89_1:CGACTTCTCCCACTTG"
+    ]
+  },
+  "var_index": {
+    "name": "Accession",
+    "sample_values": [
+      "ENSG00000223972.5",
+      "ENSG00000227232.5",
+      "ENSG00000278267.1",
+      "ENSG00000284332.1",
+      "ENSG00000268020.3"
+    ]
+  },
+  "obs": {
+    "Age": {
+      "dtype": "category",
+      "n_unique": 18,
+      "has_missing": false,
+      "categories": [
+        "8.0",
+        "9.5",
+        "10.0",
+        "8.100000381469727",
+        "6.599999904632568",
+        "7.5",
+        "9.199999809265137",
+        "6.900000095367432",
+        "8.5",
+        "6.0",
+        "6.699999809265137",
+        "5.0",
+        "12.0",
+        "11.5",
+        "13.0",
+        "14.0",
+        "5.5",
+        "7.0"
+      ]
+    },
+    "CellClass": {
+      "dtype": "category",
+      "n_unique": 12,
+      "has_missing": false,
+      "categories": [
+        "Erythrocyte",
+        "Fibroblast",
+        "Glioblast",
+        "Immune",
+        "Neuroblast",
+        "Neural crest",
+        "Neuron",
+        "Neuronal IPC",
+        "Oligo",
+        "Radial glia",
+        "Placodes",
+        "Vascular"
+      ]
+    },
+    "Chemistry": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "v2",
+        "v3"
+      ]
+    },
+    "Region": {
+      "dtype": "category",
+      "n_unique": 10,
+      "has_missing": false,
+      "categories": [
+        "Telencephalon",
+        "Diencephalon",
+        "Midbrain",
+        "Forebrain",
+        "Cerebellum",
+        "Medulla",
+        "Pons",
+        "Hindbrain",
+        "Head",
+        "Brain"
+      ]
+    },
+    "Subregion": {
+      "dtype": "category",
+      "n_unique": 18,
+      "has_missing": false,
+      "categories": [
+        "Cortex",
+        "Hypothalamus",
+        "Thalamus",
+        "Midbrain ventral",
+        "Subcortex",
+        "Forebrain",
+        "Cerebellum",
+        "Midbrain dorsal",
+        "Medulla",
+        "Midbrain",
+        "Pons",
+        "Diencephalon",
+        "Striatum",
+        "Telencephalon",
+        "Hindbrain",
+        "Head",
+        "Hippocampus",
+        "Brain"
+      ]
+    },
+    "organism_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "NCBITaxon:9606"
+      ]
+    },
+    "disease_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "PATO:0000461"
+      ]
+    },
+    "self_reported_ethnicity_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "unknown"
+      ]
+    },
+    "assay_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 2,
+      "has_missing": false,
+      "categories": [
+        "EFO:0009899",
+        "EFO:0009922"
+      ]
+    },
+    "sex_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "unknown"
+      ]
+    },
+    "development_stage_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 12,
+      "has_missing": false,
+      "categories": [
+        "HsapDv_0000046",
+        "HsapDv_0000047",
+        "HsapDv_0000048",
+        "HsapDv_0000027",
+        "HsapDv_0000029",
+        "HsapDv_0000025",
+        "HsapDv_0000022",
+        "HsapDv_0000050",
+        "HsapDv_0000049",
+        "HsapDv_0000051",
+        "HsapDv_0000052",
+        "HsapDv_0000023"
+      ]
+    },
+    "donor_id": {
+      "dtype": "category",
+      "n_unique": 26,
+      "has_missing": false,
+      "categories": [
+        "BRC2006",
+        "XHU:292",
+        "BRC2021",
+        "XHU:297",
+        "BRC2057",
+        "BRC2073",
+        "XHU:305",
+        "XHU:307",
+        "BRC2106A",
+        "BRC2110",
+        "BRC2114",
+        "XDD:313",
+        "XDD:326",
+        "BRC2147",
+        "XDD:334",
+        "XDD:342",
+        "BRC2061",
+        "XDD:348",
+        "XDD:351",
+        "BRC2191"
+      ]
+    },
+    "suspension_type": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "cell"
+      ]
+    },
+    "tissue_type": {
+      "dtype": "category",
+      "n_unique": 1,
+      "has_missing": false,
+      "categories": [
+        "tissue"
+      ]
+    },
+    "dissection": {
+      "dtype": "category",
+      "n_unique": 31,
+      "has_missing": false,
+      "categories": [
+        "Cortex",
+        "Hypothalamus",
+        "Thalamus",
+        "Ventral midbrain",
+        "Forebrain cortex",
+        "Subcortical forebrain",
+        "Forebrain",
+        "Cerebellum",
+        "Dorsal midbrain",
+        "Medulla",
+        "Mesencephalon",
+        "Pons/Cereb",
+        "Tel/diencephalon",
+        "Diencephalon",
+        "Pons",
+        "Striatum",
+        "Telencephalon",
+        "Hindbrain",
+        "Head",
+        "Pons/Medulla"
+      ]
+    },
+    "tissue_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 27,
+      "has_missing": false,
+      "categories": [
+        "UBERON:0001851",
+        "UBERON:0001898",
+        "UBERON:0001897",
+        "UBERON_0002474",
+        "UBERON:0001890",
+        "UBERON:0002743",
+        "UBERON:0002037",
+        "UBERON:0002314",
+        "UBERON:0001896",
+        "UBERON:0001891",
+        "UBERON:0001895",
+        "UBERON:0001894",
+        "UBERON:0000988",
+        "UBERON:0002435",
+        "UBERON:0001893",
+        "UBERON:0002028",
+        "UBERON:0000033",
+        "UBERON:0000454",
+        "UBERON:0002728",
+        "UBERON:0002421"
+      ]
+    },
+    "cell_type_ontology_term_id": {
+      "dtype": "category",
+      "n_unique": 12,
+      "has_missing": false,
+      "categories": [
+        "CL:0000232",
+        "CL:0000057",
+        "CL:0000030",
+        "CL:0000235",
+        "CL:0000031",
+        "CL:0011012",
+        "CL:0000540",
+        "CL:0000338",
+        "CL:0000128",
+        "CL:0000681",
+        "CL:0000032",
+        "CL:0000000"
+      ]
+    },
+    "fraction_mitochondrial": {
+      "dtype": "float32",
+      "n_unique": 906254,
+      "has_missing": false,
+      "sample_values": [
+        "0.0",
+        "0.003856867318972945",
+        "0.008797339163720608",
+        "0.0015943878097459674",
+        "0.0018687222618609667"
+      ]
+    },
+    "fraction_unspliced": {
+      "dtype": "float32",
+      "n_unique": 1368739,
+      "has_missing": false,
+      "sample_values": [
+        "0.3514038920402527",
+        "0.33833298087120056",
+        "0.3174552023410797",
+        "0.3258928656578064",
+        "0.35856109857559204"
+      ]
+    },
+    "cell_cycle_score": {
+      "dtype": "float32",
+      "n_unique": 563620,
+      "has_missing": false,
+      "sample_values": [
+        "0.0",
+        "0.00010713520168792456",
+        "0.0009566326625645161",
+        "0.010497039183974266",
+        "0.00032891129376366735"
+      ]
+    },
+    "total_genes": {
+      "dtype": "category",
+      "n_unique": 9369,
+      "has_missing": false,
+      "categories": [
+        "121",
+        "271",
+        "674",
+        "101",
+        "113",
+        "2148",
+        "81",
+        "999",
+        "136",
+        "1507",
+        "120",
+        "212",
+        "233",
+        "841",
+        "142",
+        "1604",
+        "191",
+        "1172",
+        "189",
+        "375"
+      ]
+    },
+    "total_UMIs": {
+      "dtype": "category",
+      "n_unique": 38045,
+      "has_missing": false,
+      "categories": [
+        "4630",
+        "9334",
+        "9321",
+        "3136",
+        "4281",
+        "11146",
+        "3335",
+        "9121",
+        "4484",
+        "8599",
+        "4285",
+        "8387",
+        "7223",
+        "10789",
+        "5306",
+        "12188",
+        "7313",
+        "8691",
+        "8627",
+        "13487"
+      ]
+    },
+    "sample_id": {
+      "dtype": "category",
+      "n_unique": 340,
+      "has_missing": false,
+      "categories": [
+        "10X89_1",
+        "10X89_2",
+        "10X89_3",
+        "10X89_4",
+        "10X89_5",
+        "10X89_6",
+        "10X89_7",
+        "10X89_8",
+        "10X92_1",
+        "10X92_2",
+        "10X92_3",
+        "10X92_4",
+        "10X99_5",
+        "10X99_6",
+        "10X101_1",
+        "10X101_2",
+        "10X101_3",
+        "10X101_4",
+        "10X101_5",
+        "10X101_6"
+      ]
+    },
+    "cluster_id": {
+      "dtype": "category",
+      "n_unique": 617,
+      "has_missing": false,
+      "categories": [
+        "240",
+        "236",
+        "233",
+        "235",
+        "234",
+        "239",
+        "238",
+        "237",
+        "282",
+        "283",
+        "277",
+        "286",
+        "284",
+        "279",
+        "285",
+        "278",
+        "273",
+        "275",
+        "276",
+        "280"
+      ]
+    },
+    "cycling_score": {
+      "dtype": "float32",
+      "n_unique": 1136811,
+      "has_missing": false,
+      "sample_values": [
+        "0.0021598271559923887",
+        "0.005035354755818844",
+        "0.010192039422690868",
+        "0.0035076530184596777",
+        "0.003971034660935402"
+      ]
+    },
+    "CellCyclePhase": {
+      "dtype": "category",
+      "n_unique": 5,
+      "has_missing": false,
+      "categories": [
+        "Non-cycling",
+        "Post-M",
+        "G1",
+        "S",
+        "G2M"
+      ]
+    },
+    "Age_Chemistry": {
+      "dtype": "category",
+      "n_unique": 21,
+      "has_missing": false,
+      "categories": [
+        "8.0 (v2)",
+        "9.5 (v2)",
+        "10.0 (v2)",
+        "8.100000381469727 (v2)",
+        "6.599999904632568 (v2)",
+        "7.5 (v2)",
+        "9.199999809265137 (v2)",
+        "6.900000095367432 (v2)",
+        "8.5 (v2)",
+        "6.0 (v2)",
+        "6.699999809265137 (v2)",
+        "8.5 (v3)",
+        "6.900000095367432 (v3)",
+        "5.0 (v3)",
+        "12.0 (v3)",
+        "11.5 (v3)",
+        "13.0 (v3)",
+        "14.0 (v3)",
+        "6.0 (v3)",
+        "5.5 (v3)"
+      ]
+    }
+  },
+  "var": {
+    "Accession": {
+      "dtype": "object",
+      "n_unique": 59459,
+      "has_missing": false,
+      "sample_values": [
+        "ENSG00000223972.5",
+        "ENSG00000227232.5",
+        "ENSG00000278267.1",
+        "ENSG00000284332.1",
+        "ENSG00000268020.3"
+      ]
+    },
+    "Chromosome": {
+      "dtype": "category",
+      "n_unique": 46,
+      "has_missing": false,
+      "categories": [
+        "chr1",
+        "chr2",
+        "chr3",
+        "chr4",
+        "chr5",
+        "chr6",
+        "chr7",
+        "chr8",
+        "chr9",
+        "chr10",
+        "chr11",
+        "chr12",
+        "chr13",
+        "chr14",
+        "chr15",
+        "chr16",
+        "chr17",
+        "chr18",
+        "chr19",
+        "chr20"
+      ]
+    },
+    "End": {
+      "dtype": "category",
+      "n_unique": 59295,
+      "has_missing": false,
+      "categories": [
+        "14409",
+        "29570",
+        "17436",
+        "30503",
+        "53312",
+        "64116",
+        "134836",
+        "135895",
+        "137965",
+        "173862",
+        "157887",
+        "161525",
+        "184174",
+        "195411",
+        "187958",
+        "359681",
+        "268655",
+        "348366",
+        "522928",
+        "440232"
+      ]
+    },
+    "GeneTotalUMIs": {
+      "dtype": "uint32",
+      "n_unique": 25162,
+      "has_missing": false,
+      "sample_values": [
+        "3",
+        "104073",
+        "0",
+        "20",
+        "52"
+      ]
+    },
+    "Start": {
+      "dtype": "category",
+      "n_unique": 59309,
+      "has_missing": false,
+      "categories": [
+        "11869",
+        "14404",
+        "17369",
+        "30366",
+        "52473",
+        "57598",
+        "131025",
+        "135141",
+        "137682",
+        "141474",
+        "157784",
+        "160446",
+        "182696",
+        "185217",
+        "187891",
+        "257864",
+        "266855",
+        "347982",
+        "365389",
+        "439870"
+      ]
+    },
+    "Gene": {
+      "dtype": "object",
+      "n_unique": 59459,
+      "has_missing": false,
+      "sample_values": [
+        "DDX11L1",
+        "WASH7P",
+        "MIR6859-1",
+        "MIR1302-2",
+        "OR4G4P"
+      ]
+    },
+    "gene_symbol": {
+      "dtype": "object",
+      "n_unique": 59459,
+      "has_missing": false,
+      "sample_values": [
+        "ENSG00000223972.5",
+        "ENSG00000227232.5",
+        "ENSG00000278267.1",
+        "ENSG00000284332.1",
+        "ENSG00000268020.3"
+      ]
+    }
+  },
+  "obsm_keys": [
+    "Factors",
+    "X_Embedding"
+  ],
+  "varm_keys": [
+    "Loadings"
+  ],
+  "uns_keys": [
+    "batch_condition",
+    "title"
+  ],
+  "layers": []
+}
