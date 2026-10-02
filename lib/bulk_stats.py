@@ -274,6 +274,36 @@ def cluster_quality(matrix: pd.DataFrame, labels: np.ndarray) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def silhouette_corr(matrix: pd.DataFrame, labels: np.ndarray) -> float:
+    """Mean silhouette width using correlation distance (1 - Pearson r).
+
+    For each gene: a = mean distance to its own cluster, b = mean distance to
+    the nearest other cluster, s = (b - a) / max(a, b). Unlike homogeneity
+    minus the max between-centroid correlation, this does not drift with K by
+    construction, so it can pick K > 2 when the data hold more patterns.
+    Singleton clusters score 0, the usual convention.
+    """
+    from scipy.spatial.distance import pdist, squareform
+    X = np.nan_to_num(matrix.to_numpy(dtype=float), nan=0.0)
+    labels = np.asarray(labels)
+    uniq, idx = np.unique(labels, return_inverse=True)
+    if len(uniq) < 2:
+        return np.nan
+    D = np.nan_to_num(squareform(pdist(X, metric="correlation")), nan=1.0)
+    onehot = np.zeros((len(labels), len(uniq)))
+    onehot[np.arange(len(labels)), idx] = 1.0
+    counts = onehot.sum(axis=0)
+    sums = D @ onehot                              # gene x cluster distance sums
+    own_n = counts[idx]
+    a = np.divide(sums[np.arange(len(labels)), idx], own_n - 1,
+                  out=np.zeros(len(labels)), where=own_n > 1)
+    mean_other = sums / counts
+    mean_other[np.arange(len(labels)), idx] = np.inf
+    b = mean_other.min(axis=1)
+    s = np.where(own_n > 1, (b - a) / np.maximum(np.maximum(a, b), 1e-12), 0.0)
+    return float(s.mean())
+
+
 def zscore_rows(matrix: pd.DataFrame) -> pd.DataFrame:
     """Standardise each gene to mean 0 / SD 1 across groups.
 
