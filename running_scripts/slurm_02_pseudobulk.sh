@@ -2,12 +2,12 @@
 #SBATCH --mail-user=annaludmir@mail.tau.ac.il
 #SBATCH --mail-type=END,FAIL
 #SBATCH --job-name=aim_pbulk
-#SBATCH --mem=500G
-#SBATCH --cpus-per-task=8
+#SBATCH --mem=128G
+#SBATCH --cpus-per-task=2
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=2-00:00:00
+#SBATCH --time=06:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
@@ -19,8 +19,14 @@
 #
 # Memory: a 50k-cell chunk of human_dev is roughly 2-3 GB sparse, and the pass
 # holds about three copies of it (raw, CP10K-normalised, binarised) plus the
-# dense per-group accumulators (~0.5 GB at 12k genes). 500G is generous; drop
-# CHUNK_SIZE if a node ever comes up short.
+# dense per-group accumulators (~0.5 GB at 12k genes). Peak is set by chunk
+# size and group count, not by total cells.
+#
+# Measured on full data (seff 22526176 / 22526177, human_dev v2 / v3): 59 /
+# 64 GB peak, 38 / 33 min wall, ~0.5 cores busy -- the pass is I/O-bound, so
+# extra CPUs sit idle. 128G / 2 CPUs / 6h keeps 2x headroom on memory and ~10x
+# on time. If a job hits
+# OUT_OF_MEMORY, drop CHUNK_SIZE before raising --mem.
 #
 #   sbatch slurm_02_pseudobulk.sh
 #   DATASET=human_dev sbatch --export=ALL slurm_02_pseudobulk.sh

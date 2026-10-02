@@ -2,20 +2,24 @@
 #SBATCH --mail-user=annaludmir@mail.tau.ac.il
 #SBATCH --mail-type=END,FAIL
 #SBATCH --job-name=aim_full
-#SBATCH --mem=500G
-#SBATCH --cpus-per-task=8
+#SBATCH --mem=128G
+#SBATCH --cpus-per-task=2
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=2-00:00:00
+#SBATCH --time=08:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
-# All 18 steps in one job. Simpler than the three-stage chain, and the right
+# All 19 steps in one job. Simpler than the three-stage chain, and the right
 # choice for a smoke test or a rerun you expect to succeed. The trade-off: the
-# whole thing holds a 500G allocation for its entire wall time, including the
+# whole thing holds stage 2's 128G for its entire wall time, including the
 # cheap metadata steps, and a failure in step 09 leaves you resubmitting
 # everything. For a first full run prefer submit_all.sh.
+#
+# Sized from the staged run (jobs 22526172-22526178): peak memory is step 09
+# on human_dev (~64 GB); the stages took ~4 + ~71 (human_dev v2+v3) + 8 min,
+# plus the two cortex passes, run back to back here. 8h is generous.
 #
 #   sbatch slurm_full_pipeline.sh
 #   LIMIT_CELLS=20000 sbatch --export=ALL slurm_full_pipeline.sh   # smoke test
