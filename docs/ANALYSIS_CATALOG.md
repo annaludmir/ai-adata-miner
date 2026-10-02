@@ -63,7 +63,7 @@ only 09 and 12 stream the matrix.
 | 13 | `13_cross_dataset_keys` | Gene id map, shared-gene table on the version-stripped accession, label overlap per categorical role |
 | 14 | `14_normalization_diagnostics` | **TMM** scaling factors (Robinson & Oshlack) and **MA diagnostics** per group; per-group log2-CPM quantiles for box/violin plots. Flags groups whose median M departs from 0 — composition bias that CPM cannot fix |
 | 15 | `15_sample_relationships` | **Correlation matrices** (Pearson + Spearman), **hierarchical clustering** under all three linkages with merge heights, and **PCA** with variance explained, sample scores and gene loadings |
-| 16 | `16_expression_patterns` | **Z-scored K-means** gene clustering with a K sweep reporting homogeneity *and* separation, per-cluster mean ± SD profiles, and the Z-score matrix for heatmaps |
+| 16 | `16_expression_patterns` | **Z-scored K-means** gene clustering with a K sweep reporting homogeneity, separation and silhouette (suggested K = max silhouette, flagged when flat), per-cluster mean ± SD profiles, and the Z-score matrix for heatmaps |
 | 18 | `18_chemistry_comparability` | **Pooled by design.** Measures the v2/v3 overlap: cells, donors and age span per chemistry, and per level of every covariate whether both chemistries are present with enough cells to compare. Flags donor nested in chemistry |
 | 17 | `17_gsea_panels` | **GSEA** of each panel against each group's ranked gene list: weighted running-sum ES, gene-set permutation p, BH-FDR, and leading-edge genes |
 
