@@ -8,13 +8,13 @@
 #
 # Shape of the chain:
 #
-#   stage 1  metadata (both datasets, 250G)
+#   stage 1  metadata (both datasets, 16G)
 #      |
-#      +--> stage 2  pseudobulk cortex    (500G)  ─┐  run concurrently: they
-#      +--> stage 2  pseudobulk human_dev (500G)  ─┤  read different files and
+#      +--> stage 2  pseudobulk cortex    (128G)  ─┐  run concurrently: they
+#      +--> stage 2  pseudobulk human_dev (128G)  ─┤  read different files and
 #      |                                           │  write different folders
 #      v (afterok, both)
-#   stage 3  derived analyses (200G, CSV only)
+#   stage 3  derived analyses (16G, CSV only)
 #
 # Splitting stage 2 per dataset is the point of doing this rather than
 # slurm_full_pipeline.sh: the two matrix passes are independent, and human_dev

@@ -2,11 +2,11 @@
 #SBATCH --mail-user=annaludmir@mail.tau.ac.il
 #SBATCH --mail-type=END,FAIL
 #SBATCH --job-name=aim_meta
-#SBATCH --mem=250G
+#SBATCH --mem=16G
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=0-12:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
@@ -17,6 +17,9 @@
 # does. Running them first means the inventory, the confound report and the
 # factor modules are on disk before the expensive streaming starts -- and if the
 # schema disagrees with the file, you find out in minutes rather than hours.
+#
+# Measured (seff 22526172, both datasets, full data): 2.6 GB peak, 4 min wall,
+# one core ~87% busy. 16G / 1h is >6x headroom on memory and ~15x on time.
 #
 #   sbatch slurm_01_metadata.sh
 #   DATASET=cortex sbatch --export=ALL slurm_01_metadata.sh

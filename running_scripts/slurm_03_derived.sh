@@ -2,12 +2,12 @@
 #SBATCH --mail-user=annaludmir@mail.tau.ac.il
 #SBATCH --mail-type=END,FAIL
 #SBATCH --job-name=aim_derived
-#SBATCH --mem=200G
-#SBATCH --cpus-per-task=8
+#SBATCH --mem=16G
+#SBATCH --cpus-per-task=2
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=0-12:00:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
@@ -17,6 +17,10 @@
 # permutation count costs minutes here and does not touch the matrix again.
 # It does require stage 2 to have finished, since every script here reads
 # 09_pseudobulk/ (17 additionally reads 10_markers/, so order matters).
+#
+# Measured (seff 22526178, both datasets x both chemistries): 1.8 GB peak,
+# 8 min wall, ~1.2 cores busy. 16G / 2 CPUs / 1h leaves wide headroom; raise
+# --time if you push N_PERMUTATIONS in 17 well past 1000.
 #
 #   sbatch slurm_03_derived.sh
 #   sbatch --dependency=afterok:<stage2_jobid> slurm_03_derived.sh

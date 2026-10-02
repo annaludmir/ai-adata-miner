@@ -24,7 +24,7 @@ imports the repo modules and opens both h5ad files. See
 ## Then: a smoke test
 
 Same code path, 20k cells, minutes instead of hours. Do this before committing
-a 500G allocation for two days.
+the full allocation.
 
 ```bash
 cd /miridan-data/annaludmir/ai-adata-miner/running_scripts
@@ -44,15 +44,15 @@ warnings worth acting on (schema mismatches, confounds, skipped groupings).
 That submits a three-stage chain:
 
 ```
-stage 1  metadata, both datasets      250G  12h   scripts 00-08, 13
+stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
    |
-   +--> stage 2  pseudobulk cortex v2    500G 48h  scripts 09, 12  ─┐
-   +--> stage 2  pseudobulk cortex v3    500G 48h  scripts 09, 12  ─┤ all
-   +--> stage 2  pseudobulk human_dev v2 500G 48h  scripts 09, 12  ─┤ concurrent
-   +--> stage 2  pseudobulk human_dev v3 500G 48h  scripts 09, 12  ─┘
+   +--> stage 2  pseudobulk cortex v2    128G  6h  scripts 09, 12  ─┐
+   +--> stage 2  pseudobulk cortex v3    128G  6h  scripts 09, 12  ─┤ all
+   +--> stage 2  pseudobulk human_dev v2 128G  6h  scripts 09, 12  ─┤ concurrent
+   +--> stage 2  pseudobulk human_dev v3 128G  6h  scripts 09, 12  ─┘
    |
-   v  (afterok on both)
-stage 3  derived analyses             200G  12h   scripts 10,11,14-17
+   v  (afterok on all four)
+stage 3  derived analyses              16G   1h   scripts 10,11,14-17
 ```
 
 Stage 2 fans out over dataset x chemistry because the default `--chemistry each`
@@ -61,7 +61,7 @@ instead of wall time. `CHEMISTRY=all ./submit_all.sh` halves the job count and
 pools the chemistries, at the cost of confounding age with the v2->v3 switch.
 
 The split exists for three reasons. Stage 1 never touches the count matrix, so
-holding 500G for it is waste. The two stage-2 jobs read different files and
+holding stage-2 memory for it is waste. The two stage-2 jobs read different files and
 write different folders, so running them together roughly halves wall time
 (human_dev is ~5x the cells of cortex). And stage 3 reads only `csv_exports/`,
 so re-running it after changing a panel or a K sweep costs minutes and never
