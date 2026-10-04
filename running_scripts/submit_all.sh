@@ -5,6 +5,7 @@
 #   LIMIT_CELLS=20000 ./submit_all.sh    # smoke test first (recommended)
 #   DATASETS="cortex" ./submit_all.sh    # one dataset only
 #   MAIL_SUMMARY=true ./submit_all.sh    # mail the final summary when it lands
+#   DOWNSTREAM=false ./submit_all.sh     # stop after stage 3 (skip step-3 analyses)
 #
 # Shape of the chain:
 #
@@ -15,6 +16,10 @@
 #      |                                           │  write different folders
 #      v (afterok, both)
 #   stage 3  derived analyses (16G, CSV only)
+#      |
+#      v (afterok)
+#   stage 4  downstream_analyses/ + REPORT.md (8G), written outside the repo
+#            to AIM_DOWNSTREAM_OUT (default /miridan-data/annaludmir/aim_downstream)
 #
 # Splitting stage 2 per dataset is the point of doing this rather than
 # slurm_full_pipeline.sh: the two matrix passes are independent, and human_dev
@@ -28,6 +33,7 @@ DATASETS="${DATASETS:-cortex human_dev}"
 # the extra pass costs cluster slots rather than wall time.
 CHEMISTRY="${CHEMISTRY:-each}"
 MAIL_SUMMARY="${MAIL_SUMMARY:-false}"
+DOWNSTREAM="${DOWNSTREAM:-true}"
 MAIL_HELPER="${MAIL_HELPER:-/miridan-data/annaludmir/ndd_gene_modules/running_scripts/mail_job_summary.sh}"
 
 # Everything the job scripts read from the environment has to be forwarded
@@ -35,7 +41,8 @@ MAIL_HELPER="${MAIL_HELPER:-/miridan-data/annaludmir/ndd_gene_modules/running_sc
 pass_env() {
   local kv="ALL"
   for v in AIM_ROOT AIM_ENV AI_ADATA_DATA_ROOT AI_ADATA_OUT_ROOT \
-           CHUNK_SIZE TOP_GENES LIMIT_CELLS AIM_EXCLUSIONS EMAIL_OUTPUT; do
+           CHUNK_SIZE TOP_GENES LIMIT_CELLS AIM_EXCLUSIONS AIM_DOWNSTREAM_OUT \
+           EMAIL_OUTPUT; do
     [[ -n "${!v:-}" ]] && kv="${kv},${v}=${!v}"
   done
   echo "$kv"
@@ -69,10 +76,18 @@ DEP=$(IFS=:; echo "${STAGE2_IDS[*]}")
 STAGE3=$(sbatch --parsable --dependency=afterok:"${DEP}" \
                 --export="$(pass_env),DATASET=all,CHEMISTRY=${CHEMISTRY}" slurm_03_derived.sh)
 printf 'stage 3  %-24s -> job %s  (after %s)\n' "derived analyses (all)" "$STAGE3" "$DEP"
+LAST="$STAGE3"
+STAGE4=""
+if [[ "$DOWNSTREAM" == "true" ]]; then
+  STAGE4=$(sbatch --parsable --dependency=afterok:"${STAGE3}" \
+                  --export="$(pass_env),DATASET=all,CHEMISTRY=${CHEMISTRY}" slurm_04_downstream.sh)
+  printf 'stage 4  %-24s -> job %s  (after %s)\n' "downstream analyses" "$STAGE4" "$STAGE3"
+  LAST="$STAGE4"
+fi
 
 echo
 echo "watch:    squeue -u \$USER"
-ALL_IDS=("$STAGE1" "${STAGE2_IDS[@]}" "$STAGE3")
+ALL_IDS=("$STAGE1" "${STAGE2_IDS[@]}" "$STAGE3" ${STAGE4:+"$STAGE4"})
 echo "logs:     ${AIM_JOBS_OUT:-/miridan-data/annaludmir/jobs_output}/{$(IFS=,; echo "${ALL_IDS[*]}")}.out"
 echo "summary:  ${AIM_JOBS_OUT:-/miridan-data/annaludmir/jobs_output}/<jobid>_summary.txt"
 echo "cancel:   scancel ${ALL_IDS[*]}"
@@ -85,9 +100,9 @@ echo "-- clear them with the scancel line above."
 
 if [[ "$MAIL_SUMMARY" == "true" ]]; then
   if [[ -x "$MAIL_HELPER" ]]; then
-    nohup "$MAIL_HELPER" "$STAGE3" >/dev/null 2>&1 &
+    nohup "$MAIL_HELPER" "$LAST" >/dev/null 2>&1 &
     echo
-    echo "mail_job_summary.sh watching job ${STAGE3} (compute nodes cannot relay mail themselves)"
+    echo "mail_job_summary.sh watching job ${LAST} (compute nodes cannot relay mail themselves)"
   else
     echo
     echo "WARNING: MAIL_SUMMARY=true but ${MAIL_HELPER} is not executable -- skipping."

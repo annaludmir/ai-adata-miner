@@ -41,7 +41,7 @@ warnings worth acting on (schema mismatches, confounds, skipped groupings).
 ./submit_all.sh          # run on the LOGIN node, not via sbatch
 ```
 
-That submits a three-stage chain:
+That submits a four-stage chain:
 
 ```
 stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
@@ -53,6 +53,20 @@ stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
    |
    v  (afterok on all four)
 stage 3  derived analyses              16G   1h   scripts 10,11,14-17
+   |
+   v  (afterok)
+stage 4  step-3 downstream analyses     8G  30m   downstream_analyses/ + REPORT.md
+```
+
+Stage 4 writes **outside the repo**, to `AIM_DOWNSTREAM_OUT` (default
+`/miridan-data/annaludmir/aim_downstream/results`, with `REPORT.md` one level
+up). `REPORT.md`, the `SUMMARY.md` files and the figures are tracked in git, so
+writing them into the cluster checkout would make the next `git pull` conflict.
+Read them there, or copy them back with `rsync`. `DOWNSTREAM=false ./submit_all.sh`
+stops after stage 3. To rerun step 3 alone after changing an analysis:
+
+```bash
+sbatch slurm_04_downstream.sh
 ```
 
 Stage 2 fans out over dataset x chemistry because the default `--chemistry each`
@@ -87,6 +101,8 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | `CHEMISTRY` | `each` | `each` runs v2 and v3 apart; `all` pools them |
 | `LIMIT_CELLS` | unset | first N cells — smoke test; outputs are partial |
 | `AIM_EXCLUSIONS` | `exclusions.csv` | cells to leave out (see the top-level README); `none` disables |
+| `AIM_DOWNSTREAM_OUT` | `/miridan-data/annaludmir/aim_downstream/results` | where stage 4 writes step-3 results |
+| `DOWNSTREAM` | `true` | `false` makes `submit_all.sh` stop after stage 3 |
 | `CHUNK_SIZE` | `50000` | cells per streaming chunk (stage 2) |
 | `TOP_GENES` | `12000` | genes exported in pseudobulk; panel genes always added |
 | `AIM_ROOT` | `/miridan-data/annaludmir/ai-adata-miner` | repo location |

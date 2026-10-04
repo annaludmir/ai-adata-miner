@@ -85,6 +85,28 @@ aim_run() {
 }
 
 
+# aim_run_script <label> <path/to/script.py> [args...]
+# Same bookkeeping as aim_run, for scripts outside scripts_generated/ (step 3),
+# which take no --dataset/--chemistry flags.
+aim_run_script() {
+  local label="$1" script="$2"; shift 2
+  echo ""
+  echo "--------------------------------------------------------------"
+  echo ">>> ${label}   [$(date '+%T')]"
+  echo "--------------------------------------------------------------"
+  local t0=$SECONDS
+  if mamba run -p "$AIM_ENV" python -u "$script" "$@"; then
+    local dt=$(( SECONDS - t0 ))
+    echo "--- ${label} OK (${dt}s)"
+    AIM_OK+=("${label} ${dt}s")
+  else
+    local rc=$? dt=$(( SECONDS - t0 ))
+    echo "!!! ${label} FAILED rc=${rc} after ${dt}s -- continuing"
+    AIM_FAILED+=("${label} rc=${rc}")
+  fi
+}
+
+
 aim_csv_count() {
   find "$AI_ADATA_OUT_ROOT" -name '*.csv' 2>/dev/null | wc -l | tr -d ' '
 }
