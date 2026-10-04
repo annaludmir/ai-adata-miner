@@ -28,10 +28,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 import pandas as pd
 
-import config
 from lib import cli
-from lib.io_utils import (Manifest, add_derived_obs_columns, gene_frame, log,
-                          read_obs, read_var, resolve_role)
+from lib.io_utils import (Manifest, add_derived_obs_columns, exclusion_mask,
+                          gene_frame, log, normalise_donor, read_obs, read_var,
+                          resolve_role)
 
 SCRIPT = "13_cross_dataset_keys"
 CROSS_KEY = "_cross_dataset"
@@ -55,12 +55,17 @@ def main() -> None:
         g = gene_frame(read_var(path), key).reset_index()
         frames[key] = g
         obs = add_derived_obs_columns(read_obs(path), key)
+        obs = obs.loc[exclusion_mask(obs, key)[0]]
         labels[key] = {}
         for role in LABEL_ROLES:
             col = ("cyclephase_h" if role == "cyclephase" and "cyclephase_h" in obs.columns
                    else resolve_role(obs, role))
             if col is not None:
-                labels[key][role] = (obs[col].astype(str).value_counts()
+                values = obs[col].astype(str)
+                if role == "donor":
+                    # cortex writes 'XHU:1966:307' for human_dev's 'XHU:307'
+                    values = values.map(normalise_donor)
+                labels[key][role] = (values.value_counts()
                                      .rename_axis("level").reset_index(name="n_cells"))
         log(f"  {key}: {len(g):,} genes, roles found: {', '.join(labels[key])}")
 

@@ -30,9 +30,10 @@ import pandas as pd
 
 import config
 from lib import cli
-from lib.aggregate import GroupAggregator, group_codes
+from lib.aggregate import GroupAggregator, drop_empty_levels, group_codes
 from lib.io_utils import (Manifest, XReader, add_derived_obs_columns,
-                          chemistry_mask, gene_frame, list_h5ad_keys, log,
+                          chemistry_mask, exclusion_mask, gene_frame,
+                          list_h5ad_keys, log,
                           read_obs, read_var,
                           resolve_cluster_columns, resolve_role)
 
@@ -85,6 +86,8 @@ def run(key: str, args, chem: str | None = None,
         man.flush()
         return
     chem_keep = chem_keep.to_numpy()
+    excl_keep, _ = exclusion_mask(obs, key, within=chem_keep)
+    chem_keep = chem_keep & excl_keep
     if chem_keep.sum() == 0:
         log(f"  no cells with chemistry={chem}; skipping")
         man.flush()
@@ -129,7 +132,10 @@ def run(key: str, args, chem: str | None = None,
     for name, series in groupings.items():
         codes, levels = group_codes(series)
         codes = np.where(chem_keep, codes, -1)
-        if len(levels) > config.MAX_GROUPS_WIDE or (codes >= 0).sum() == 0:
+        if (codes >= 0).sum() == 0:
+            continue
+        codes, levels = drop_empty_levels(codes, levels)
+        if len(levels) > config.MAX_GROUPS_WIDE:
             continue
         log(f"  {name}: {len(levels)} groups -- streaming both layers...")
         s_agg = stream_layer(path, spliced, codes, len(levels), gene_mask, n_kept,

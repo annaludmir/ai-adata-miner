@@ -31,18 +31,11 @@ import pandas as pd
 import config
 from lib import cli
 from lib.bulk_stats import ma_statistics, tmm_normalization_factors
-from lib.io_utils import Manifest, log
+from lib.io_utils import Manifest, load_group_matrix, log
 
 SCRIPT = "14_normalization_diagnostics"
 SUBDIR = "14_normalization"
 QUANTILES = [0.0, 0.05, 0.25, 0.5, 0.75, 0.95, 1.0]
-
-
-def load_matrix(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    df = df.set_index(df.columns[0])
-    df.index.name = "gene"
-    return df.apply(pd.to_numeric, errors="coerce")
 
 
 def run(key: str, args, chem: str | None = None,
@@ -59,7 +52,7 @@ def run(key: str, args, chem: str | None = None,
     summary = []
     for cpath in sorted(pb.glob("*__pseudobulk_counts.csv")):
         grouping = cpath.name.replace("__pseudobulk_counts.csv", "")
-        counts = load_matrix(cpath)
+        counts = load_group_matrix(cpath)
         if counts.shape[1] < 2:
             continue
         log(f"  {grouping}: {counts.shape[0]:,} genes x {counts.shape[1]} groups")

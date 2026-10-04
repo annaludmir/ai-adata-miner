@@ -242,9 +242,71 @@ def add_derived_obs_columns(obs: pd.DataFrame, dataset_key: str) -> pd.DataFrame
     return out
 
 
+def normalise_donor(d) -> str:
+    """cortex writes 'XHU:1966:307' where human_dev writes 'XHU:307'."""
+    import re
+    return re.sub(r"^(XHU|XDD):\d+:(\d+)$", r"\1:\2", str(d))
+
+
+def load_exclusions(dataset_key: str) -> pd.DataFrame:
+    """Exclusion rules for one dataset ('*' in the dataset column = every dataset)."""
+    cols = ["dataset", "role", "value", "reason"]
+    src = str(config.EXCLUSIONS_FILE or "")
+    if src.lower() in ("", "none") or not Path(src).exists():
+        if src.lower() not in ("", "none"):
+            log(f"  exclusions file {src} not found -- no cells excluded")
+        return pd.DataFrame(columns=cols)
+    rules = pd.read_csv(src, dtype=str, comment="#").fillna("")
+    missing = set(cols) - set(rules.columns)
+    if missing:
+        raise ValueError(f"{src} is missing columns {sorted(missing)}")
+    return rules[rules["dataset"].isin([dataset_key, "*"])].reset_index(drop=True)
+
+
+def exclusion_mask(obs: pd.DataFrame, dataset_key: str,
+                   within: np.ndarray | None = None) -> tuple[np.ndarray, pd.DataFrame]:
+    """(keep, report): which cells survive the exclusion rules, and what each removed.
+
+    A rule's role is a semantic role from config.COLUMN_ROLES (age, donor,
+    sample, region, ...) or a raw obs column name. Ages match numerically
+    (to 0.01 pcw, so '5' matches the categorical string '5.0'); donors match
+    after normalising cortex-style IDs; everything else matches as a string.
+    `within` (e.g. the chemistry mask) restricts the counts in the report and
+    the log to the cells actually being analysed.
+    """
+    rules = load_exclusions(dataset_key)
+    keep = np.ones(len(obs), dtype=bool)
+    scope = np.ones(len(obs), dtype=bool) if within is None else np.asarray(within, bool)
+    report = []
+    for r in rules.itertuples():
+        col = resolve_role(obs, r.role) or (r.role if r.role in obs.columns else None)
+        if col is None:
+            log(f"  WARNING: exclusion rule {r.role}={r.value} -- no such column in "
+                f"{dataset_key}; rule ignored")
+            hit = np.zeros(len(obs), dtype=bool)
+        elif r.role == "age":
+            age = coerce_numeric(obs[col]).to_numpy()
+            hit = np.abs(age - float(r.value)) < 0.01
+        elif r.role == "donor":
+            hit = (obs[col].astype(str).map(normalise_donor)
+                   == normalise_donor(r.value)).to_numpy()
+        else:
+            hit = (obs[col].astype(str) == str(r.value)).to_numpy()
+        report.append({"dataset": dataset_key, "role": r.role, "column": col or "",
+                       "value": r.value, "reason": r.reason,
+                       "n_cells_matched": int((hit & scope).sum()),
+                       "n_cells_removed": int((hit & keep & scope).sum())})
+        keep &= ~hit
+    if report and (~keep & scope).any():
+        log(f"  exclusions ({config.EXCLUSIONS_FILE}): removed {int((~keep & scope).sum()):,} cells -- "
+            + "; ".join(f"{x['role']}={x['value']}: {x['n_cells_removed']:,}" for x in report))
+    return keep, pd.DataFrame(report, columns=["dataset", "role", "column", "value", "reason",
+                                               "n_cells_matched", "n_cells_removed"])
+
+
 def load_obs(path, dataset_key: str, chemistry: str | None = None,
              limit_cells: int | None = None):
-    """Read .obs, apply the chemistry filter, add the derived columns.
+    """Read .obs, apply the chemistry filter and exclusions, add derived columns.
 
     Returns (obs, keep) where `keep` is a boolean array over the rows that were
     read, so callers can subset a positionally-aligned obsm matrix the same way.
@@ -258,9 +320,39 @@ def load_obs(path, dataset_key: str, chemistry: str | None = None,
     mask = chemistry_mask(obs, chemistry)
     if mask is None:
         return None, None
-    keep = mask.to_numpy()
-    obs = obs.loc[keep]
-    return add_derived_obs_columns(obs, dataset_key), keep
+    excl_keep, report = exclusion_mask(obs, dataset_key, within=mask.to_numpy())
+    keep = mask.to_numpy() & excl_keep
+    out = add_derived_obs_columns(obs.loc[keep], dataset_key)
+    out.attrs["exclusions"] = report     # what was removed, for the record
+    return out, keep
+
+
+def load_group_matrix(path, min_cells: int | None = None) -> pd.DataFrame:
+    """Read a 09_pseudobulk gene x group table, keeping groups with enough cells.
+
+    Uses the sibling `<grouping>__group_summary.csv`. Groups below `min_cells`
+    (default config.MIN_CELLS_PER_GROUP) are dropped -- this also removes the
+    all-zero columns that exports from before the empty-group fix contain.
+    """
+    path = Path(path)
+    df = pd.read_csv(path)
+    df = df.set_index(df.columns[0])
+    df.index.name = "gene"
+    df = df.apply(pd.to_numeric, errors="coerce")
+    min_cells = config.MIN_CELLS_PER_GROUP if min_cells is None else min_cells
+    grouping = path.name.split("__")[0]
+    spath = path.with_name(f"{grouping}__group_summary.csv")
+    if spath.exists():
+        gs = pd.read_csv(spath)
+        good = set(gs.loc[gs["n_cells"] >= min_cells, "group"].astype(str))
+        keep = [c for c in df.columns if str(c) in good]
+    else:
+        keep = [c for c in df.columns if df[c].fillna(0).abs().sum() > 0]
+    dropped = df.shape[1] - len(keep)
+    if dropped:
+        log(f"  {grouping}: dropped {dropped}/{df.shape[1]} groups with "
+            f"< {min_cells} cells")
+    return df[keep]
 
 
 def chemistry_mask(obs: pd.DataFrame, chemistry: str | None) -> pd.Series | None:

@@ -35,7 +35,7 @@ MAIL_HELPER="${MAIL_HELPER:-/miridan-data/annaludmir/ndd_gene_modules/running_sc
 pass_env() {
   local kv="ALL"
   for v in AIM_ROOT AIM_ENV AI_ADATA_DATA_ROOT AI_ADATA_OUT_ROOT \
-           CHUNK_SIZE TOP_GENES LIMIT_CELLS EMAIL_OUTPUT; do
+           CHUNK_SIZE TOP_GENES LIMIT_CELLS AIM_EXCLUSIONS EMAIL_OUTPUT; do
     [[ -n "${!v:-}" ]] && kv="${kv},${v}=${!v}"
   done
   echo "$kv"

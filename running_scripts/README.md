@@ -86,6 +86,7 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | `DATASET` / `DATASETS` | `all` / `cortex human_dev` | which dataset(s) |
 | `CHEMISTRY` | `each` | `each` runs v2 and v3 apart; `all` pools them |
 | `LIMIT_CELLS` | unset | first N cells — smoke test; outputs are partial |
+| `AIM_EXCLUSIONS` | `exclusions.csv` | cells to leave out (see the top-level README); `none` disables |
 | `CHUNK_SIZE` | `50000` | cells per streaming chunk (stage 2) |
 | `TOP_GENES` | `12000` | genes exported in pseudobulk; panel genes always added |
 | `AIM_ROOT` | `/miridan-data/annaludmir/ai-adata-miner` | repo location |

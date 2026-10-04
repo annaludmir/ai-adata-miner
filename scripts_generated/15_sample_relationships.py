@@ -32,7 +32,7 @@ import pandas as pd
 import config
 from lib import cli
 from lib.bulk_stats import cut_tree_clusters, hierarchical_linkage, pca
-from lib.io_utils import Manifest, log
+from lib.io_utils import Manifest, load_group_matrix, log
 
 SCRIPT = "15_sample_relationships"
 SUBDIR = "15_relationships"
@@ -40,13 +40,6 @@ LINKAGES = ["average", "complete", "single"]
 TOP_VARIABLE_GENES = 2000
 N_COMPONENTS = 10
 MAX_GROUPS_FOR_MATRIX = 400
-
-
-def load_matrix(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    df = df.set_index(df.columns[0])
-    df.index.name = "gene"
-    return df.apply(pd.to_numeric, errors="coerce")
 
 
 def run(key: str, args, chem: str | None = None,
@@ -62,7 +55,7 @@ def run(key: str, args, chem: str | None = None,
 
     for mpath in sorted(pb.glob("*__mean_lognorm.csv")):
         grouping = mpath.name.replace("__mean_lognorm.csv", "")
-        expr = load_matrix(mpath).dropna(how="all")
+        expr = load_group_matrix(mpath).dropna(how="all")
         if expr.shape[1] < 3:
             log(f"  skipping {grouping}: only {expr.shape[1]} group(s)")
             continue

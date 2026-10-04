@@ -69,6 +69,12 @@ only 09 and 12 stream the matrix.
 
 ## Queued for step 3 — CSV-only, no h5ad needed
 
+**Done** (see `downstream_analyses/REPORT.md`): composition vs age with donor as
+the replicate unit (02); monotonic within-class age trends replicated across
+chemistries (03; transient patterns not yet); NDD panel cell-class preference
+against an expression-matched null, and panel overlap with age trends (04);
+cortex vs human_dev and v2 vs v3 concordance (03, 05).
+
 These all run off `csv_exports/`. Discover inputs via `csv_exports/<dataset>/_manifest.csv`.
 
 **Composition statistics**

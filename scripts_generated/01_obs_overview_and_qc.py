@@ -84,7 +84,13 @@ def run(key: str, args, chem: str | None = None,
         log(f"  no cells with chemistry={chem}; skipping")
         man.flush()
         return
-    log(f"  {len(obs):,} cells after chemistry filter ({chem or 'pooled'})")
+    log(f"  {len(obs):,} cells after chemistry filter ({chem or 'pooled'}) and exclusions")
+    excl = obs.attrs.get("exclusions")
+    if excl is not None and len(excl):
+        excl = excl.assign(exclusions_file=str(config.EXCLUSIONS_FILE))
+        man.write(excl, "exclusions_applied",
+                  "Exclusion rules applied to this stratum and the cells each removed",
+                  subdir=SUBDIR)
     qc = resolve_qc_frame(obs)
     qc_cols = list(qc.columns)
     log(f"  {len(obs):,} cells | QC metrics available: {', '.join(qc_cols) or 'none'}")

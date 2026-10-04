@@ -3,9 +3,10 @@ __pycache__/
 .venv/
 venv*/
 logs/
-# Exported CSVs are regenerable from the h5ad files; the manifest and the
-# observed schemas are small and worth versioning.
+# Data CSVs never go to GitHub: exports regenerate from the h5ad files, and
+# step-3 tables regenerate from the exports in seconds. (exclusions.csv at the
+# repo root is configuration, not data, and is versioned.)
 csv_exports/**/*.csv
-!csv_exports/**/_manifest.csv
+downstream_analyses/results/**/*.csv
 *.h5ad
 .DS_Store
