@@ -24,8 +24,17 @@ to write results elsewhere, set `AIM_DOWNSTREAM_OUT`.
 | 03 | Which genes rise or fall with age *within* a cell class, in both donor sets? | age point (≈ donor) | `age_trends_combined.csv`, `ndd_genes_with_age_trends.csv` |
 | 04 | Where are NDD panels expressed, against expression-matched random genes, and are they enriched among age trends? | age point (≈ donor) | `panel_class_preference_combined.csv`, `panel_age_trend_enrichment.csv` |
 | 05 | Does each cell class mean the same thing in v2 and v3, and in cortex and human_dev? | class profile | `identity_reproducibility.csv` |
+| 06 | Gene lists: what the data see of each list, how the lists overlap, where each is expressed, and whether a list moves with age as a group | age point (≈ donor) | `list_coverage.csv`, `list_class_preference_combined.csv`, `list_age_coordination_combined.csv` |
+| 07 | Do a list's genes co-express (across clusters, and within cell classes)? Which members carry that, how does the list split into sub-modules, which outside genes track it? | cluster profile; sub-modules cross-validated between donor sets | `coherence_combined.csv`, `submodules.csv`, `candidate_members.csv` |
+| 08 | Data-driven co-expression modules: which gene groups exist without any list, where they peak, how they change with age, which lists they hold | cluster profile; modules rediscovered in each chemistry | `modules.csv`, `module_age_trends_combined.csv`, `module_gene_set_enrichment.csv` |
 
-Order matters: 02 reads the sex calls from 01, and 04 reads the trends from 03.
+Order matters: 02 reads the sex calls from 01, and 04 and 06 read the trends
+from 03.
+
+06 and 07 need gene lists. They read the folder named by `config.GENE_LISTS_DIR`:
+`AIM_GENE_LISTS` if set, otherwise the cluster folder when it exists, otherwise
+the git-ignored `gene_lists/` in the repo. With no lists, they write a short
+summary saying so. 08 runs either way and also tests the seed NDD panels.
 `run_all.sh` runs them in number order.
 
 ## Rules every analysis here follows
@@ -49,6 +58,18 @@ These come from the audit (01), not from habit:
   expressed, and highly expressed genes pass tests more often.
 - **cortex is primary for within-class questions.** human_dev classes pool
   regions whose sampling changes with age.
+- **Co-expression is measured across fine clusters, and nulls are matched on
+  level and spread.** Clusters need at least 100 cells and must not be
+  dominated by one donor. Random comparison sets draw each gene from the same
+  bin of mean level × spread as the real gene.
+- **A group that was found in the data is never tested on the data that found
+  it.** Sub-modules (07) and modules (08) are discovered in one chemistry and
+  tested in the other.
+- **Sub-modules are compared with what the same procedure finds in random
+  lists.** During development, a random list split into sub-modules that also
+  held up in the other donor set, because the transcriptome has strong,
+  reproducible structure. So 07 asks whether a list's sub-modules are tighter
+  than the sub-modules carved out of matched random lists.
 
 ## Adding an analysis
 

@@ -54,32 +54,9 @@ PRIMARY = "cortex"
 DRIFT_RHO = 0.1        # |median gene rho| above this = a global shift remains
 
 
-def class_age_tables(n: str):
-    """{cell_class: (log2 TMM-CPM genes x ages, detection genes x ages, ages, min_cells)}.
-
-    TMM is computed within a class, across its age points: the question is how
-    one cell type changes, so its own ages are the libraries to align.
-    """
-    cnt = C.group_matrix(n, "cell_class_x_age", "pseudobulk_counts")
-    det = C.group_matrix(n, "cell_class_x_age", "detection_fraction")
-    gs = C.group_summary(n, "cell_class_x_age").set_index("group")
-    out = {}
-    by_class: dict[str, list[tuple[float, str]]] = {}
-    for col in cnt.columns:
-        cls, age = C.split_class_age(col)
-        by_class.setdefault(cls, []).append((age, col))
-    for cls, items in by_class.items():
-        items.sort()
-        cols = [c for _, c in items]
-        ages = np.array([a for a, _ in items])
-        out[cls] = (C.tmm_log_cpm(cnt[cols]), det[cols], ages,
-                    int(gs.loc[cols, "n_cells"].min()))
-    return out
-
-
 def test_stratum(n: str, ds: str, chem: str, chrom, panel_of) -> pd.DataFrame:
     rows = []
-    for cls, (ln, det, ages, min_cells) in class_age_tables(n).items():
+    for cls, (ln, det, ages, min_cells) in C.class_age_logcpm(n).items():
         if len(ages) < MIN_AGES:
             C.log(f"  {n} {cls}: {len(ages)} age points (<{MIN_AGES}), skipped")
             continue
@@ -315,7 +292,7 @@ def figures(out: C.Output, per: pd.DataFrame, rep: pd.DataFrame) -> None:
         if not ups and not downs:
             continue
         slots = ups + [None] * (4 - len(ups)) + downs + [None] * (4 - len(downs))
-        tables = {c: class_age_tables(C.ns(PRIMARY, c)).get(cls) for c in C.CHEMISTRIES}
+        tables = {c: C.class_age_logcpm(C.ns(PRIMARY, c)).get(cls) for c in C.CHEMISTRIES}
         fig, axes = plt.subplots(2, 4, figsize=(12, 5), squeeze=False)
         for ax, gene in zip(axes.flat, slots):
             if gene is None:

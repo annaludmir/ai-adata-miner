@@ -424,5 +424,374 @@ def clr(counts: pd.DataFrame, pseudo: float = 0.5) -> pd.DataFrame:
                         index=counts.index, columns=counts.columns)
 
 
+# ---------------------------------------------------------------------------
+# per-(cell class, age) tables and cell-class preference of gene sets
+# ---------------------------------------------------------------------------
+def zscore_rows(X: np.ndarray) -> np.ndarray:
+    mu = X.mean(axis=1, keepdims=True)
+    sd = X.std(axis=1, keepdims=True)
+    return np.divide(X - mu, sd, out=np.zeros_like(X), where=sd > 0)
+
+
+def class_age_logcpm(n: str):
+    """{cell_class: (log2 TMM-CPM genes x ages, detection genes x ages, ages, min_cells)}.
+
+    TMM is computed within a class, across its age points: the question is how
+    one cell type changes, so its own ages are the libraries to align.
+    """
+    cnt = group_matrix(n, "cell_class_x_age", "pseudobulk_counts")
+    det = group_matrix(n, "cell_class_x_age", "detection_fraction")
+    gs = group_summary(n, "cell_class_x_age").set_index("group")
+    out = {}
+    by_class: dict[str, list[tuple[float, str]]] = {}
+    for col in cnt.columns:
+        cls, age = split_class_age(col)
+        by_class.setdefault(cls, []).append((age, col))
+    for cls, items in by_class.items():
+        items.sort()
+        cols = [c for _, c in items]
+        ages = np.array([a for a, _ in items])
+        out[cls] = (tmm_log_cpm(cnt[cols]), det[cols], ages,
+                    int(gs.loc[cols, "n_cells"].min()))
+    return out
+
+
+def set_mean_rows(Z: np.ndarray, sets: np.ndarray) -> np.ndarray:
+    """Mean of Z's rows over each set: (n_sets x k indices) -> (n_sets x columns).
+
+    Same as Z[sets].mean(axis=1) but through a sparse sum, so 5,000 random sets
+    of a 1,000-gene list do not materialise a sets x genes x columns array.
+    Repeated indices count once per occurrence, as in the dense version.
+    """
+    from scipy import sparse
+    sets = np.asarray(sets)
+    n_sets, k = sets.shape
+    ind = sparse.csr_matrix((np.ones(sets.size), (np.repeat(np.arange(n_sets), k), sets.ravel())),
+                            shape=(n_sets, Z.shape[0]))
+    return np.asarray(ind @ Z) / k
+
+
+def set_class_preference(n: str, ds: str, chem: str, sets: dict[str, list[str]],
+                         rng: np.random.Generator, n_random: int = 5000,
+                         n_bins: int = 10, min_genes: int = 5, min_age_points: int = 3,
+                         label: str = "panel") -> pd.DataFrame:
+    """Does each gene set score higher in one cell class than in the others?
+
+    Pseudobulk counts per (cell class, age point) -> log2 TMM-CPM; genes >= 5
+    CPM on average; each gene Z-scored across all columns; a set's score in a
+    column is the mean Z of its genes. For class c, at every age point, the
+    difference between c and the mean of the other classes is taken, and T is
+    its mean over age points (age points are donors). The null is T for random
+    sets drawing one gene from each member's expression decile.
+    """
+    cnt = group_matrix(n, "cell_class_x_age", "pseudobulk_counts")
+    lc = tmm_log_cpm(cnt)
+    lc = lc.loc[lc.mean(axis=1) >= np.log2(5 + 1)]
+    labels = [split_class_age(c) for c in lc.columns]
+    cls_of = np.array([c for c, _ in labels])
+    age_of = np.array([a for _, a in labels])
+    Z = zscore_rows(lc.to_numpy(float))
+    gidx = {g: i for i, g in enumerate(lc.index.to_numpy())}
+
+    level = lc.mean(axis=1).to_numpy()
+    bins = np.digitize(level, np.quantile(level, np.linspace(0, 1, n_bins + 1)[1:-1]))
+    members_of_bin = [np.nonzero(bins == b)[0] for b in range(n_bins)]
+
+    classes = sorted(set(cls_of))
+    layout = {}
+    for c in classes:
+        pairs = []
+        for a in sorted(set(age_of)):
+            here = np.nonzero(age_of == a)[0]
+            mine = [j for j in here if cls_of[j] == c]
+            others = [j for j in here if cls_of[j] != c]
+            if mine and others:
+                pairs.append((mine[0], others))
+        layout[c] = pairs
+
+    def T(score_cols: np.ndarray, c: str) -> tuple[np.ndarray, np.ndarray]:
+        d = np.stack([score_cols[:, m] - score_cols[:, o].mean(axis=1)
+                      for m, o in layout[c]], axis=1)
+        return d.mean(axis=1), (d > 0).mean(axis=1)
+
+    rows = []
+    for name, genes in sets.items():
+        idx = np.array([gidx[x] for x in genes if x in gidx])
+        if idx.size < min_genes:
+            continue
+        obs = Z[idx].mean(axis=0)[None, :]
+        rand = np.empty((n_random, idx.size), dtype=int)
+        for k, gi in enumerate(idx):
+            rand[:, k] = rng.choice(members_of_bin[bins[gi]], size=n_random)
+        null_scores = set_mean_rows(Z, rand)
+        for c in classes:
+            if len(layout[c]) < min_age_points:
+                continue
+            t_obs, frac = T(obs, c)
+            t_null, _ = T(null_scores, c)
+            t_obs, frac = float(t_obs[0]), float(frac[0])
+            p = (np.sum(np.abs(t_null - t_null.mean()) >= abs(t_obs - t_null.mean())) + 1) / (n_random + 1)
+            rows.append({"dataset": ds, "chemistry": chem, label: name, "cell_class": c,
+                         "n_genes": int(idx.size), "n_age_points": len(layout[c]),
+                         "T_mean_z_difference": t_obs, "null_mean": float(t_null.mean()),
+                         "null_sd": float(t_null.std()),
+                         "effect_vs_null_sd": (t_obs - t_null.mean()) / t_null.std()
+                         if t_null.std() > 0 else np.nan,
+                         "frac_age_points_higher": frac, "perm_p": p})
+    return pd.DataFrame(rows)
+
+
+def combine_preference(pref: pd.DataFrame, label: str = "panel") -> pd.DataFrame:
+    """v2 x v3 per (dataset, set, class): signed Stouffer, BH per dataset, tier."""
+    comb = []
+    for (ds, name, c), g in pref.groupby(["dataset", label, "cell_class"], sort=False):
+        g = g.set_index("chemistry")
+        if not set(CHEMISTRIES) <= set(g.index):
+            continue
+        a, b = g.loc["v2"], g.loc["v3"]
+        eff = [a.effect_vs_null_sd, b.effect_vs_null_sd]
+        Z, pc = signed_stouffer([np.array([eff[0]]), np.array([eff[1]])],
+                                [np.array([a.perm_p]), np.array([b.perm_p])],
+                                [np.sqrt(a.n_age_points), np.sqrt(b.n_age_points)])
+        comb.append({"dataset": ds, label: name, "cell_class": c,
+                     "effect_v2": eff[0], "p_v2": a.perm_p, "frac_higher_v2": a.frac_age_points_higher,
+                     "effect_v3": eff[1], "p_v3": b.perm_p, "frac_higher_v3": b.frac_age_points_higher,
+                     "stouffer_z": float(Z[0]), "combined_p": float(pc[0])})
+    comb = pd.DataFrame(comb)
+    if comb.empty:
+        return comb
+    comb["combined_q"] = np.nan
+    for _, idx in comb.groupby("dataset").groups.items():
+        comb.loc[idx, "combined_q"] = bh(comb.loc[idx, "combined_p"])
+    comb["tier"] = replication_tier(comb.effect_v2, comb.p_v2, comb.effect_v3, comb.p_v3,
+                                    comb.combined_q)
+    comb["direction"] = np.where(comb.stouffer_z > 0, "enriched", "depleted")
+    return comb.sort_values(["dataset", "combined_p"])
+
+
+# ---------------------------------------------------------------------------
+# user gene lists
+# ---------------------------------------------------------------------------
+def gene_lists_dir() -> Path:
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import config
+    return Path(config.GENE_LISTS_DIR)
+
+
+_LISTS_CACHE: dict[str, dict[str, list[str]]] = {}
+_MAPPED_CACHE: dict[str, dict[str, list[str]]] = {}
+
+
+def gene_lists_label() -> str:
+    """The gene-list folder for reports: repo-relative when inside the repo."""
+    d = gene_lists_dir()
+    try:
+        return str(d.resolve().relative_to(REPO.resolve()))
+    except ValueError:
+        return str(d)
+
+
+def gene_lists() -> dict[str, list[str]]:
+    """{list name: genes as written in the file}, from config.GENE_LISTS_DIR.
+
+    Same reader as the extraction step (lib/panels.read_gene_list): a CSV with a
+    'gene' column (or its first column), or plain text with one gene per line.
+    Set AIM_GENE_LISTS to point elsewhere.
+    """
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from lib.panels import load_user_lists
+    key = str(gene_lists_dir())
+    if key not in _LISTS_CACHE:
+        _LISTS_CACHE[key] = load_user_lists(gene_lists_dir())
+    return _LISTS_CACHE[key]
+
+
+_ID_MAP: dict[str, pd.DataFrame] = {}
+
+
+def map_genes(genes, dataset: str) -> pd.DataFrame:
+    """Resolve list entries to this dataset's gene symbols.
+
+    Exact symbol first, then case-insensitive, then Ensembl id (version
+    stripped). Returns input, symbol and how it matched ('missing' if not).
+    """
+    if dataset not in _ID_MAP:
+        g = csv("_cross_dataset", "gene_id_map.csv", low_memory=False)
+        _ID_MAP[dataset] = g[g["dataset"] == dataset]
+    g = _ID_MAP[dataset]
+    symbols = set(g["symbol"].astype(str))
+    upper = {}
+    for s in g["symbol"].astype(str):
+        upper.setdefault(s.upper(), s)
+    ensg = dict(zip(g["accession_base"].astype(str), g["symbol"].astype(str)))
+    rows = []
+    for x in genes:
+        x = str(x).strip()
+        if x in symbols:
+            rows.append((x, x, "exact"))
+        elif x.upper() in upper:
+            rows.append((x, upper[x.upper()], "case"))
+        elif x.split(".")[0] in ensg:
+            rows.append((x, ensg[x.split(".")[0]], "ensembl"))
+        else:
+            rows.append((x, "", "missing"))
+    return pd.DataFrame(rows, columns=["input", "symbol", "match"])
+
+
+def mapped_lists(dataset: str) -> dict[str, list[str]]:
+    """User lists as unique symbols of this dataset (unmatched entries dropped)."""
+    if dataset not in _MAPPED_CACHE:
+        out = {}
+        for name, genes in gene_lists().items():
+            m = map_genes(genes, dataset)
+            out[name] = list(dict.fromkeys(m.loc[m.match != "missing", "symbol"]))
+        _MAPPED_CACHE[dataset] = out
+    return _MAPPED_CACHE[dataset]
+
+
+# ---------------------------------------------------------------------------
+# co-expression across fine clusters
+# ---------------------------------------------------------------------------
+# The finest clustering in each file, and the minimum cells for a cluster's
+# pseudobulk to be stable enough for a correlation.
+COEXPR_GROUPING = {"cortex": "cluster_ClustersSurprise", "human_dev": "cluster_cluster_id"}
+COEXPR_MIN_CELLS = 100
+COEXPR_MIN_CPM = 10.0       # a gene must reach this CPM ...
+COEXPR_MIN_CLUSTERS = 3     # ... in at least this many clusters
+
+
+def cluster_expression(namespace: str):
+    """(log2 TMM-CPM genes x clusters, cluster annotation) for co-expression.
+
+    Clusters need >= COEXPR_MIN_CELLS cells and must not be donor-dominated
+    (04's batch_dominated_flag: > 90% of cells from one donor), since a
+    one-donor cluster can make a donor's quirks look like co-expression.
+    Genes must reach COEXPR_MIN_CPM in >= COEXPR_MIN_CLUSTERS clusters.
+    """
+    ds = namespace.split("__")[0]
+    grouping = COEXPR_GROUPING[ds]
+    cnt = group_matrix(namespace, grouping, "pseudobulk_counts", min_cells=COEXPR_MIN_CELLS)
+    clustering = grouping.replace("cluster_", "", 1)
+    prof = csv(namespace, f"04_clusters/cluster_profile_{clustering}.csv")
+    prof["cluster"] = prof["cluster"].astype(str)
+    prof = prof.set_index("cluster")
+    keep = [c for c in cnt.columns
+            if c in prof.index and not bool(prof.loc[c, "batch_dominated_flag"])]
+    cnt = cnt[keep]
+    lc = tmm_log_cpm(cnt)
+    expressed = (lc >= np.log2(COEXPR_MIN_CPM + 1)).sum(axis=1) >= COEXPR_MIN_CLUSTERS
+    lc = lc.loc[expressed]
+    annot = prof.loc[keep, ["n_cells", "dominant_cell_class", "purity_cell_class",
+                            "dominant_region", "age_pcw_median", "purity_donor"]]
+    return lc, annot
+
+
+COEXPR_MIN_CLUSTERS_PER_CLASS = 5
+
+
+def context_values(lc: pd.DataFrame, annot: pd.DataFrame, context: str) -> pd.DataFrame | None:
+    """The matrix a co-expression context correlates (genes x clusters).
+
+    across_clusters: log2 CPM as is. within_class: each gene's mean per dominant
+    cell class subtracted, keeping classes with >= COEXPR_MIN_CLUSTERS_PER_CLASS
+    clusters (None if fewer than two such classes' worth of clusters remain).
+    """
+    if context == "across_clusters":
+        return lc
+    cls = annot.loc[lc.columns, "dominant_cell_class"].astype(str).to_numpy()
+    counts = pd.Series(cls).value_counts()
+    keep_cls = set(counts[counts >= COEXPR_MIN_CLUSTERS_PER_CLASS].index)
+    cols = np.array([c in keep_cls for c in cls])
+    if cols.sum() < 2 * COEXPR_MIN_CLUSTERS_PER_CLASS:
+        return None
+    Xw = lc.loc[:, cols].to_numpy(float).copy()
+    for c in keep_cls:
+        m = cls[cols] == c
+        Xw[:, m] -= Xw[:, m].mean(axis=1, keepdims=True)
+    return pd.DataFrame(Xw, index=lc.index, columns=lc.columns[cols])
+
+
+def coexpr_contexts(lc: pd.DataFrame, annot: pd.DataFrame) -> dict:
+    """{context: (unit-rank rows, matching bins, cluster columns, z-scored values)}.
+
+    across_clusters -- the log2 CPM profiles as they are: co-expression between
+                       cell types and states (identity programmes).
+    within_class    -- each gene's mean per dominant cell class removed first
+                       (classes with >= COEXPR_MIN_CLUSTERS_PER_CLASS clusters):
+                       co-variation inside cell types, beyond shared identity.
+    Bins (mean level x spread) always come from the raw log2 CPM, so a gene's
+    matching bin does not depend on the context.
+    """
+    out = {}
+    for context in ("across_clusters", "within_class"):
+        V = context_values(lc, annot, context)
+        if V is None:
+            continue
+        X = V.to_numpy(float)
+        out[context] = (unit_rank_rows(X), expression_bins(lc[V.columns]),
+                        list(V.columns), zscore_rows(X))
+    return out
+
+
+def unit_rank_rows(X: np.ndarray) -> np.ndarray:
+    """Rank each row, centre it and scale to unit length.
+
+    Dot products of the result are Spearman correlations, and the mean pairwise
+    correlation of a set follows from the length of its row sum.
+    """
+    R = rank_rows(np.asarray(X, dtype=float))
+    R = R - R.mean(axis=1, keepdims=True)
+    nrm = np.linalg.norm(R, axis=1, keepdims=True)
+    return np.divide(R, nrm, out=np.zeros_like(R), where=nrm > 0)
+
+
+def expression_bins(lc: pd.DataFrame, n: int = 5) -> np.ndarray:
+    """Bin id per gene from quantiles of mean level x spread (n x n bins).
+
+    Highly expressed and highly variable genes correlate more strongly with
+    anything, so a fair null for a gene set draws random genes from the same
+    level-by-spread bins as its members.
+    """
+    X = lc.to_numpy(float)
+    m, s = X.mean(axis=1), X.std(axis=1)
+    qm = np.digitize(m, np.quantile(m, np.linspace(0, 1, n + 1)[1:-1]))
+    qs = np.digitize(s, np.quantile(s, np.linspace(0, 1, n + 1)[1:-1]))
+    return qm * n + qs
+
+
+def matched_sets(bins: np.ndarray, idx: np.ndarray, n_sets: int,
+                 rng: np.random.Generator) -> np.ndarray:
+    """(n_sets x len(idx)) random gene indices, each set matching idx bin for bin.
+
+    Drawn without replacement within a set, so a random set never repeats a
+    gene (a repeat would add a spurious r = 1 pair to a coherence null).
+    """
+    need = pd.Series(bins[idx]).value_counts()
+    pools = {b: np.nonzero(bins == b)[0] for b in need.index}
+    out = np.empty((n_sets, idx.size), dtype=np.int64)
+    for i in range(n_sets):
+        col = 0
+        for b, k in need.items():
+            pool = pools[b]
+            take = rng.choice(pool, size=min(k, pool.size), replace=False)
+            if take.size < k:          # tiny bin: top up with replacement
+                take = np.concatenate([take, rng.choice(pool, size=k - take.size)])
+            out[i, col:col + k] = take
+            col += k
+    return out
+
+
+def set_sums(Zn: np.ndarray, sets: np.ndarray) -> np.ndarray:
+    """Row sums of Zn over each set: (n_sets x k) -> (n_sets x columns)."""
+    return set_mean_rows(Zn, sets) * sets.shape[1]
+
+
+def coherence_from_sums(sums: np.ndarray, k: int) -> np.ndarray:
+    """Mean pairwise correlation of unit rows from their sum: (|S|^2 - k) / (k(k-1))."""
+    return ((sums ** 2).sum(axis=-1) - k) / (k * (k - 1))
+
+
 def fmt_p(p: float) -> str:
     return "NA" if not np.isfinite(p) else (f"{p:.2g}" if p >= 1e-3 else f"{p:.1e}")

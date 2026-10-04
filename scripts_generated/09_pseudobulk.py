@@ -101,8 +101,14 @@ def select_genes(path, var: pd.DataFrame, genes: pd.DataFrame, top_n: int,
         "total_umis": totals,
     })
     sel["rank_by_umis"] = sel["total_umis"].rank(ascending=False, method="first").astype(int)
+    # Gene lists come from many sources: match symbols case-insensitively and
+    # accept Ensembl ids (version stripped) as well.
     panel = all_panel_genes()
-    sel["in_panel"] = sel["symbol"].isin(panel)
+    panel_upper = {str(g).upper() for g in panel}
+    panel_ensg = {str(g).split(".")[0] for g in panel if str(g).startswith("ENSG")}
+    sel["in_panel"] = sel["symbol"].str.upper().isin(panel_upper)
+    if "accession_base" in genes.columns and panel_ensg:
+        sel["in_panel"] |= genes["accession_base"].astype(str).isin(panel_ensg).to_numpy()
     sel["selected"] = (sel["rank_by_umis"] <= top_n) | sel["in_panel"]
     # A panel gene with zero counts cannot contribute anything but a zero row.
     sel.loc[sel["total_umis"] <= 0, "selected"] = False

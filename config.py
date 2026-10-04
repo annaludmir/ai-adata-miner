@@ -22,6 +22,16 @@ CSV_EXPORTS = Path(os.environ.get("AI_ADATA_OUT_ROOT", REPO_ROOT / "csv_exports"
 # reason) in exclusions.csv. Override with AIM_EXCLUSIONS=<path> or the
 # --exclusions flag; the value 'none' disables exclusions entirely.
 EXCLUSIONS_FILE = os.environ.get("AIM_EXCLUSIONS", str(REPO_ROOT / "exclusions.csv"))
+
+# Folder of user gene lists (one list per file: CSV with a 'gene' column -- or
+# its first column -- or plain text, one gene per line; the file stem names the
+# list). They join the panels as group 'user_lists', so script 09 always
+# exports their genes and 11/17 score them; step 3 analyses them as groups.
+# Override with AIM_GENE_LISTS. The repo-local default is git-ignored.
+_CLUSTER_GENE_LISTS = Path("/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on")
+GENE_LISTS_DIR = Path(os.environ.get(
+    "AIM_GENE_LISTS",
+    _CLUSTER_GENE_LISTS if _CLUSTER_GENE_LISTS.exists() else REPO_ROOT / "gene_lists"))
 SCHEMA_DIR = REPO_ROOT / "schemas"
 
 # ---------------------------------------------------------------------------

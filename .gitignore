@@ -10,3 +10,5 @@ csv_exports/**/*.csv
 downstream_analyses/results/**/*.csv
 *.h5ad
 .DS_Store
+# Local copy of the user gene lists (config.GENE_LISTS_DIR); data, not code.
+gene_lists/

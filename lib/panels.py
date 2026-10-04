@@ -127,14 +127,64 @@ ALL_PANEL_GROUPS: dict[str, dict[str, list[str]]] = {
 }
 
 
-def load_panels() -> dict[str, dict[str, list[str]]]:
-    """Built-in panels, with any user file in panels/ merged over the top.
+USER_LIST_GROUP = "user_lists"
+_GENE_COLUMNS = ("gene", "Gene", "genes", "symbol", "Symbol", "gene_symbol", "gene_name")
 
-    A JSON file must map panel-name -> list of symbols; it is filed under the
-    group named by its stem (e.g. panels/ndd.json overrides the 'ndd' group).
-    A CSV must have columns `panel,gene`.
+
+def read_gene_list(path) -> list[str]:
+    """One gene list file -> unique genes in file order.
+
+    CSV/TSV: the first column named like a gene column ('gene', 'symbol', ...),
+    otherwise the first column. Anything else: one gene per line (first
+    tab/comma field), '#' lines skipped. Same conventions as ndd_gene_modules.
+    """
+    import pandas as pd
+    path = Path(path)
+    if path.suffix.lower() in (".csv", ".tsv"):
+        df = pd.read_csv(path, sep="\t" if path.suffix.lower() == ".tsv" else ",")
+        col = next((c for c in _GENE_COLUMNS if c in df.columns), df.columns[0])
+        raw = df[col].tolist()
+    else:
+        raw = []
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                raw.append(line.replace(",", "\t").split("\t")[0])
+    seen, out = set(), []
+    for g in raw:
+        g = str(g).strip()
+        if g and g.lower() not in ("nan", "none") and g not in seen:
+            seen.add(g)
+            out.append(g)
+    return out
+
+
+def load_user_lists(folder=None) -> dict[str, list[str]]:
+    """Every gene list in config.GENE_LISTS_DIR (or `folder`), keyed by file stem."""
+    folder = Path(folder or config.GENE_LISTS_DIR)
+    if not folder.is_dir():
+        return {}
+    lists = {}
+    for path in sorted(folder.iterdir()):
+        if path.suffix.lower() in (".csv", ".tsv", ".txt") and not path.name.startswith("."):
+            genes = read_gene_list(path)
+            if genes:
+                lists[path.stem] = genes
+    return lists
+
+
+def load_panels() -> dict[str, dict[str, list[str]]]:
+    """Built-in panels, user gene lists, and any file in panels/ merged on top.
+
+    User gene lists (config.GENE_LISTS_DIR) form the group 'user_lists'.
+    A JSON file in panels/ must map panel-name -> list of symbols; it is filed
+    under the group named by its stem (e.g. panels/ndd.json overrides 'ndd').
+    A CSV in panels/ must have columns `panel,gene`.
     """
     panels = {g: {k: list(v) for k, v in d.items()} for g, d in ALL_PANEL_GROUPS.items()}
+    user = load_user_lists()
+    if user:
+        panels[USER_LIST_GROUP] = user
     if not PANEL_DIR.exists():
         return panels
 

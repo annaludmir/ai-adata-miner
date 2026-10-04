@@ -62,6 +62,7 @@ aim_setup() {
   echo "chemistry  : ${CHEMISTRY}"
   echo "threads    : ${OMP_NUM_THREADS} (OMP/OpenBLAS/MKL)"
   echo "exclusions : ${AIM_EXCLUSIONS:-${AIM_ROOT}/exclusions.csv}"
+  echo "gene lists : ${AIM_GENE_LISTS:-/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on (default)}"
   [[ -n "$LIMIT_CELLS" ]] && echo "LIMIT_CELLS: ${LIMIT_CELLS}  (SMOKE TEST -- results are partial)"
   echo "started    : $(date '+%F %T')"
   echo "=============================================================="

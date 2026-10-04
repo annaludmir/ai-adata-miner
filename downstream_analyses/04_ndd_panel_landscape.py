@@ -50,78 +50,6 @@ MIN_AGE_POINTS = 3     # age points at which class c and >= 1 other class coexis
 MAX_LISTED = 6         # items per bullet in SUMMARY.md; the CSVs hold the rest
 
 
-def zscore_rows(X: np.ndarray) -> np.ndarray:
-    mu = X.mean(axis=1, keepdims=True)
-    sd = X.std(axis=1, keepdims=True)
-    return np.divide(X - mu, sd, out=np.zeros_like(X), where=sd > 0)
-
-
-def class_preference(n: str, ds: str, chem: str, ndd: pd.DataFrame,
-                     rng: np.random.Generator) -> pd.DataFrame:
-    cnt = C.group_matrix(n, "cell_class_x_age", "pseudobulk_counts")
-    lc = C.tmm_log_cpm(cnt)
-    lc = lc.loc[lc.mean(axis=1) >= np.log2(5 + 1)]          # expressed: >= 5 CPM on average
-    labels = [C.split_class_age(c) for c in lc.columns]
-    cls_of = np.array([c for c, _ in labels])
-    age_of = np.array([a for _, a in labels])
-    Z = zscore_rows(lc.to_numpy(float))
-    genes = lc.index.to_numpy()
-    gidx = {g: i for i, g in enumerate(genes)}
-
-    # expression bins for matched random sets
-    level = lc.mean(axis=1).to_numpy()
-    bins = np.digitize(level, np.quantile(level, np.linspace(0, 1, N_BINS + 1)[1:-1]))
-    members_of_bin = [np.nonzero(bins == b)[0] for b in range(N_BINS)]
-
-    classes = sorted(set(cls_of))
-    ages = sorted(set(age_of))
-    # per class: list of (column of c, columns of others) at each shared age
-    layout = {}
-    for c in classes:
-        pairs = []
-        for a in ages:
-            here = np.nonzero(age_of == a)[0]
-            mine = [j for j in here if cls_of[j] == c]
-            others = [j for j in here if cls_of[j] != c]
-            if mine and others:
-                pairs.append((mine[0], others))
-        layout[c] = pairs
-
-    def T(score_cols: np.ndarray, c: str) -> tuple[np.ndarray, np.ndarray]:
-        """score_cols: (sets x columns) -> (mean difference, fraction of ages > 0)."""
-        d = np.stack([score_cols[:, m] - score_cols[:, o].mean(axis=1)
-                      for m, o in layout[c]], axis=1)
-        return d.mean(axis=1), (d > 0).mean(axis=1)
-
-    rows = []
-    for (pname), g in ndd.groupby("panel"):
-        idx = np.array([gidx[x] for x in g["gene"] if x in gidx])
-        if idx.size < MIN_PANEL_GENES:
-            continue
-        obs = Z[idx].mean(axis=0)[None, :]
-        # matched random sets: one random gene from each panel gene's bin
-        rand = np.empty((N_RANDOM, idx.size), dtype=int)
-        for k, gi in enumerate(idx):
-            pool = members_of_bin[bins[gi]]
-            rand[:, k] = rng.choice(pool, size=N_RANDOM)
-        null_scores = Z[rand].mean(axis=1)                    # sets x columns
-        for c in classes:
-            if len(layout[c]) < MIN_AGE_POINTS:
-                continue
-            t_obs, frac = T(obs, c)
-            t_null, _ = T(null_scores, c)
-            t_obs, frac = float(t_obs[0]), float(frac[0])
-            p = (np.sum(np.abs(t_null - t_null.mean()) >= abs(t_obs - t_null.mean())) + 1) / (N_RANDOM + 1)
-            rows.append({"dataset": ds, "chemistry": chem, "panel": pname, "cell_class": c,
-                         "n_genes": int(idx.size), "n_age_points": len(layout[c]),
-                         "T_mean_z_difference": t_obs, "null_mean": float(t_null.mean()),
-                         "null_sd": float(t_null.std()),
-                         "effect_vs_null_sd": (t_obs - t_null.mean()) / t_null.std()
-                         if t_null.std() > 0 else np.nan,
-                         "frac_age_points_higher": frac, "perm_p": p})
-    return pd.DataFrame(rows)
-
-
 def main() -> None:
     out = C.Output(SLUG)
     C.log(f"=== {SLUG}")
@@ -137,34 +65,16 @@ def main() -> None:
         pan = C.panels(n)
         ndd = pan[(pan.panel_group == "ndd") & pan.exported_in_pseudobulk.astype(bool)]
         ndd_by_ns[n] = ndd
-        pref.append(class_preference(n, ds, chem, ndd, rng))
+        sets = {pname: list(g["gene"]) for pname, g in ndd.groupby("panel")}
+        pref.append(C.set_class_preference(n, ds, chem, sets, rng, n_random=N_RANDOM,
+                                           n_bins=N_BINS, min_genes=MIN_PANEL_GENES,
+                                           min_age_points=MIN_AGE_POINTS))
         C.log(f"  {n}: scored {ndd.panel.nunique()} NDD panels")
     pref = pd.concat(pref, ignore_index=True)
     out.write(pref, "panel_class_preference_per_stratum",
               "Panel x class: mean Z difference vs other classes over age points, matched-null p")
 
-    comb = []
-    for (ds, pname, c), g in pref.groupby(["dataset", "panel", "cell_class"], sort=False):
-        g = g.set_index("chemistry")
-        if not set(C.CHEMISTRIES) <= set(g.index):
-            continue
-        a, b = g.loc["v2"], g.loc["v3"]
-        eff = [a.effect_vs_null_sd, b.effect_vs_null_sd]
-        Z, pc = C.signed_stouffer([np.array([eff[0]]), np.array([eff[1]])],
-                                  [np.array([a.perm_p]), np.array([b.perm_p])],
-                                  [np.sqrt(a.n_age_points), np.sqrt(b.n_age_points)])
-        comb.append({"dataset": ds, "panel": pname, "cell_class": c,
-                     "effect_v2": eff[0], "p_v2": a.perm_p, "frac_higher_v2": a.frac_age_points_higher,
-                     "effect_v3": eff[1], "p_v3": b.perm_p, "frac_higher_v3": b.frac_age_points_higher,
-                     "stouffer_z": float(Z[0]), "combined_p": float(pc[0])})
-    comb = pd.DataFrame(comb)
-    comb["combined_q"] = np.nan
-    for _, idx in comb.groupby("dataset").groups.items():
-        comb.loc[idx, "combined_q"] = C.bh(comb.loc[idx, "combined_p"])
-    comb["tier"] = C.replication_tier(comb.effect_v2, comb.p_v2, comb.effect_v3, comb.p_v3,
-                                      comb.combined_q)
-    comb["direction"] = np.where(comb.stouffer_z > 0, "enriched", "depleted")
-    comb = comb.sort_values(["dataset", "combined_p"])
+    comb = C.combine_preference(pref)
     out.write(comb, "panel_class_preference_combined",
               "v2 x v3 combined panel preference per class; tier replicated / supported")
 

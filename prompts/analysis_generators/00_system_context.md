@@ -22,6 +22,9 @@ Before writing anything, read `downstream_analyses/REPORT.md` and
 data can support. Reuse `downstream_analyses/_common.py` (loading, TMM log
 CPM, exact permutation tests, signed Stouffer replication, SUMMARY.md writer)
 rather than re-implementing it.
+For gene groups and co-expression, reuse `cluster_expression`,
+`coexpr_contexts`, `matched_sets` and `coherence_from_sums` (see 07 and 08).
+Gene lists are read with `gene_lists()` and `mapped_lists(dataset)`.
 
 ## Non-negotiable statistical rules
 

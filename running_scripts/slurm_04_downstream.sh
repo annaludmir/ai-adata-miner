@@ -7,7 +7,7 @@
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
@@ -18,7 +18,9 @@
 # the cluster checkout would make the next `git pull` conflict. Copy the folder
 # back with rsync, or point AIM_DOWNSTREAM_OUT elsewhere.
 #
-# Takes ~20 s and <1 GB on a laptop; 8G / 1 CPU / 30 min is generous.
+# Analyses 01-05 take ~20 s on a laptop; the co-expression analyses 06-08 add
+# about a minute and ~1.5 GB (longer with large gene lists). Cluster nodes ran
+# stage 3 several times slower than a laptop, hence 8G / 1 CPU / 1h.
 #
 #   sbatch slurm_04_downstream.sh
 #   sbatch --dependency=afterok:<stage3_jobid> slurm_04_downstream.sh

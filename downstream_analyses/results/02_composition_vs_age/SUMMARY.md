@@ -1,6 +1,6 @@
 # Cell-class composition across age
 
-_Generated 2026-10-04 12:25 UTC by `downstream_analyses/02_composition_vs_age.py` from `csv_exports/`._
+_Generated 2026-10-04 13:15 UTC by `downstream_analyses/02_composition_vs_age.py` from `csv_exports/`._
 
 ## Question
 

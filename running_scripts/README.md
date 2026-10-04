@@ -55,7 +55,7 @@ stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
 stage 3  derived analyses              16G   3h   scripts 10,11,14-17
    |
    v  (afterok)
-stage 4  step-3 downstream analyses     8G  30m   downstream_analyses/ + REPORT.md
+stage 4  step-3 downstream analyses     8G   1h   downstream_analyses/ + REPORT.md
 ```
 
 Stage 4 writes **outside the repo**, to `AIM_DOWNSTREAM_OUT` (default
@@ -101,6 +101,7 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | `CHEMISTRY` | `each` | `each` runs v2 and v3 apart; `all` pools them |
 | `LIMIT_CELLS` | unset | first N cells — smoke test; outputs are partial |
 | `AIM_EXCLUSIONS` | `exclusions.csv` | cells to leave out (see the top-level README); `none` disables |
+| `AIM_GENE_LISTS` | `/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on` | folder of gene lists (one per file) analysed in step 3 and always exported by stage 2 |
 | `AIM_DOWNSTREAM_OUT` | `/miridan-data/annaludmir/aim_downstream/results` | where stage 4 writes step-3 results |
 | `DOWNSTREAM` | `true` | `false` makes `submit_all.sh` stop after stage 3 |
 | `CHUNK_SIZE` | `50000` | cells per streaming chunk (stage 2) |

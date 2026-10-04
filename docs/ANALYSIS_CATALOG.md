@@ -73,7 +73,11 @@ only 09 and 12 stream the matrix.
 the replicate unit (02); monotonic within-class age trends replicated across
 chemistries (03; transient patterns not yet); NDD panel cell-class preference
 against an expression-matched null, and panel overlap with age trends (04);
-cortex vs human_dev and v2 vs v3 concordance (03, 05).
+cortex vs human_dev and v2 vs v3 concordance (03, 05); user gene lists, covering
+coverage, overlap, cell-class preference and age coordination (06); gene-list
+co-expression coherence, cross-validated sub-modules and candidate members (07);
+WGCNA-style co-expression modules with preservation across donor sets, hub
+genes, age dynamics and list enrichment (08).
 
 These all run off `csv_exports/`. Discover inputs via `csv_exports/<dataset>/_manifest.csv`.
 

@@ -50,6 +50,23 @@ Step 3 re-applies the age, donor and sample rules to older exports. Use
 `--exclusions other.csv` (or `AIM_EXCLUSIONS=...` on the cluster) to swap the
 file, and `--exclusions none` to switch exclusions off.
 
+## Gene lists
+
+Put gene lists in one folder, one list per file: a CSV with a `gene` column (or
+the list in its first column), or plain text with one gene per line. The file
+name, without extension, becomes the list's name. Symbols match
+case-insensitively, and Ensembl ids are accepted.
+
+- On the cluster, the default folder is
+  `/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on`.
+- Locally, it is `gene_lists/` in the repo. Git ignores that folder, so the lists
+  are never uploaded.
+- Set `AIM_GENE_LISTS=/path` to use any other folder.
+
+The lists join the gene panels as group `user_lists`. Stage 2 then always
+exports their genes, however lowly expressed, and scripts 11 and 17 score them.
+Step-3 analyses 06-08 study them as groups.
+
 ## Running
 
 ```bash
