@@ -52,7 +52,7 @@ stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
    +--> stage 2  pseudobulk human_dev v3 128G  6h  scripts 09, 12  ─┘
    |
    v  (afterok on all four)
-stage 3  derived analyses              16G   1h   scripts 10,11,14-17
+stage 3  derived analyses              16G   3h   scripts 10,11,14-17
    |
    v  (afterok)
 stage 4  step-3 downstream analyses     8G  30m   downstream_analyses/ + REPORT.md

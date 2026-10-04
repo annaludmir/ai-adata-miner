@@ -21,6 +21,15 @@ JOBID="${SLURM_JOB_ID:-local}"
 OUTFILE="${AIM_JOBS_OUT}/${JOBID}.out"
 SUMMARY="${AIM_JOBS_OUT}/${JOBID}_summary.txt"
 
+# Match numpy/scipy's thread pools (OpenBLAS, MKL, OpenMP) to the CPUs Slurm
+# granted. Left alone they start one thread per core the node *has*, which on
+# a 2-CPU allocation means dozens of threads fighting over two cores -- stage 3
+# ran ~20x slower than a laptop and timed out when its CPUs went from 8 to 2.
+for _v in OMP_NUM_THREADS OPENBLAS_NUM_THREADS MKL_NUM_THREADS NUMEXPR_NUM_THREADS; do
+  export "$_v=${!_v:-${SLURM_CPUS_PER_TASK:-1}}"
+done
+unset _v
+
 # Pipeline configuration, read by config.py.
 export AI_ADATA_DATA_ROOT="${AI_ADATA_DATA_ROOT:-/miridan-data/annaludmir/ndd_gene_modules/data}"
 export AI_ADATA_OUT_ROOT="${AI_ADATA_OUT_ROOT:-${AIM_ROOT}/csv_exports}"
@@ -51,6 +60,7 @@ aim_setup() {
   echo "dataset    : ${DATASET}"
   echo "chunk size : ${CHUNK_SIZE}"
   echo "chemistry  : ${CHEMISTRY}"
+  echo "threads    : ${OMP_NUM_THREADS} (OMP/OpenBLAS/MKL)"
   echo "exclusions : ${AIM_EXCLUSIONS:-${AIM_ROOT}/exclusions.csv}"
   [[ -n "$LIMIT_CELLS" ]] && echo "LIMIT_CELLS: ${LIMIT_CELLS}  (SMOKE TEST -- results are partial)"
   echo "started    : $(date '+%F %T')"
