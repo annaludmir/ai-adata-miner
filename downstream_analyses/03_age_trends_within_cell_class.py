@@ -111,6 +111,22 @@ def test_stratum(n: str, ds: str, chem: str, chrom, panel_of) -> pd.DataFrame:
     return df
 
 
+def strongest(g: pd.DataFrame, direction: str, n: int) -> list[str]:
+    """Top-n genes in one direction, ranked reproducibly.
+
+    Exact permutation p-values are discrete, so many genes share a Stouffer Z
+    and the order among them would otherwise depend on floating-point noise
+    (it differed between the cluster and a laptop at the 1e-15 level). Ties
+    are broken by effect size -- mean |log2 FC per week| over both
+    chemistries -- then by gene name.
+    """
+    h = g[g.direction == direction].assign(
+        _z=lambda d: d.stouffer_z.abs().round(9),
+        _eff=lambda d: (d.log2fc_per_week_v2.abs() + d.log2fc_per_week_v3.abs()) / 2)
+    return list(h.sort_values(["_z", "_eff", "gene"], ascending=[False, False, True])
+                .gene.head(n))
+
+
 def combine(per: pd.DataFrame) -> pd.DataFrame:
     """v2 x v3 per (dataset, class, gene) -> signed Stouffer, BH, tier."""
     out = []
@@ -205,9 +221,8 @@ def main() -> None:
                              f" of {int(r.not_replicated + r.get('replicated', 0) + r.get('supported', 0))} tested"
                              for _, r in c.iterrows()) + ".")
     for cls, g in rep[(rep.dataset == PRIMARY) & ~rep.sex_linked].groupby("cell_class"):
-        g = g.sort_values("stouffer_z")
-        dn = ", ".join(g[g.direction == "down"].gene.head(TOP_N))
-        up = ", ".join(g[g.direction == "up"].gene[::-1].head(TOP_N))
+        dn = ", ".join(strongest(g, "down", TOP_N))
+        up = ", ".join(strongest(g, "up", TOP_N))
         f.append(f"**{PRIMARY} {cls}** -- strongest replicated, rising: {up or 'none'}; "
                  f"falling: {dn or 'none'}.")
     drifted = counts[(counts.filter(like="median_gene_rho_").abs() > DRIFT_RHO).any(axis=1)]
@@ -295,9 +310,8 @@ def figures(out: C.Output, per: pd.DataFrame, rep: pd.DataFrame) -> None:
     if plt is None or rep.empty:
         return
     for cls, g in rep[(rep.dataset == PRIMARY) & ~rep.sex_linked].groupby("cell_class"):
-        g = g.sort_values("combined_p")
-        ups = list(g[g.direction == "up"].gene.head(4))
-        downs = list(g[g.direction == "down"].gene.head(4))
+        ups = strongest(g, "up", 4)
+        downs = strongest(g, "down", 4)
         if not ups and not downs:
             continue
         slots = ups + [None] * (4 - len(ups)) + downs + [None] * (4 - len(downs))

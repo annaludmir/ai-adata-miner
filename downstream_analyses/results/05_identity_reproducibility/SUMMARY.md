@@ -1,6 +1,6 @@
 # Cell-class identity across chemistries and files
 
-_Generated 2026-10-04 05:56 UTC by `downstream_analyses/05_identity_reproducibility.py` from `csv_exports/`._
+_Generated 2026-10-04 12:25 UTC by `downstream_analyses/05_identity_reproducibility.py` from `csv_exports/`._
 
 ## Question
 
@@ -26,10 +26,10 @@ Does each cell class carry the same expression identity in v2 and v3, and in cor
 ## Key findings
 
 - **cortex__v2 vs cortex__v3** (different chemistry, independent donors): same-class r 0.96-0.97 (median 0.96) vs best other class 0.80 at most; top-100 marker Jaccard median 0.39. Closest neighbours (margin < 0.2): Glioblast (r 0.96 vs Radial glia 0.77); Radial glia (r 0.96 vs Glioblast 0.80).
-- **human_dev__v2 vs human_dev__v3** (different chemistry, independent donors): same-class r 0.88-0.98 (median 0.95) vs best other class 0.87 at most; top-100 marker Jaccard median 0.45. Closest neighbours (margin < 0.2): Neuroblast (r 0.97 vs Neuron 0.87); Neuron (r 0.98 vs Neuroblast 0.84).
+- **human_dev__v2 vs human_dev__v3** (different chemistry, independent donors): same-class r 0.82-0.98 (median 0.95) vs best other class 0.88 at most; top-100 marker Jaccard median 0.47. Closest neighbours (margin < 0.2): Neuroblast (r 0.98 vs Neuron 0.88); Neuron (r 0.98 vs Neuroblast 0.84).
 - **cortex__v2 vs human_dev__v2** (same donors, different file): same-class r 0.90-0.93 (median 0.91) vs best other class 0.79 at most; top-100 marker Jaccard median 0.14. Closest neighbours (margin < 0.2): Glioblast (r 0.90 vs Radial glia 0.79); Neuroblast (r 0.93 vs Neuron 0.79); Neuron (r 0.91 vs Neuroblast 0.72); Radial glia (r 0.93 vs Glioblast 0.77).
-- **cortex__v3 vs human_dev__v3** (same donors, different file): same-class r 0.87-0.91 (median 0.89) vs best other class 0.80 at most; top-100 marker Jaccard median 0.08. Closest neighbours (margin < 0.2): Neuroblast (r 0.91 vs Neuron 0.80); Neuron (r 0.89 vs Neuroblast 0.74).
-- **Class identity reproduces across chemistries**: a class matches itself first in 17/17 chemistry comparisons, so v2 and v3 results about the same class describe the same cell type. The smallest margins fall between adjacent lineages (radial glia / glioblast, neuroblast / neuron), as expected along a differentiation continuum. Marker lists overlap less than profiles agree, because v2's lower sensitivity reorders the tail of each list.
+- **cortex__v3 vs human_dev__v3** (same donors, different file): same-class r 0.87-0.91 (median 0.89) vs best other class 0.79 at most; top-100 marker Jaccard median 0.09. Closest neighbours (margin < 0.2): Neuroblast (r 0.91 vs Neuron 0.79); Neuron (r 0.89 vs Neuroblast 0.74).
+- **Class identity reproduces across chemistries**: a class matches itself first in 16/16 chemistry comparisons, so v2 and v3 results about the same class describe the same cell type. The smallest margins fall between adjacent lineages (radial glia / glioblast, neuroblast / neuron), as expected along a differentiation continuum. Marker lists overlap less than profiles agree, because v2's lower sensitivity reorders the tail of each list.
 - **Across files, profiles agree but marker lists do not** (median Jaccard 0.14): human_dev classes span the whole brain, so their top markers include regional genes that cortex cells never express. Compare the files by profile, not by marker list.
 
 ## Limitations

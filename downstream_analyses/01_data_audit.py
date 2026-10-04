@@ -99,6 +99,9 @@ def donor_map(out: C.Output) -> pd.DataFrame:
             "cells_human_dev": h["n_cells"] if h is not None else np.nan,
             "same_chemistry": h is not None and h["chemistry"] == r["chemistry"],
             "same_age": h is not None and h["age_pcw"] == r["age_pcw"],
+            # unmatched because an exclusion rule removed them from human_dev
+            "excluded_from_human_dev": h is None and C.excluded(
+                "human_dev", donor=key, age=r["age_pcw"]),
         })
     df = pd.DataFrame(rows)
     out.write(df, "donor_map_cortex_to_human_dev",
@@ -310,14 +313,28 @@ def main() -> None:
             f"({r.frac_cells_at_shared_ages:.0%} of cells). Donors nested in chemistry: "
             f"{r.donor_nested_in_chemistry}. v2 and v3 are therefore independent donor sets "
             "that can replicate each other, but not be pooled as if equivalent.")
-    matched = int((dmap.same_chemistry & dmap.human_dev_donor.ne("")).sum())
-    renamed = int((dmap.cortex_donor != dmap.human_dev_donor).sum())
-    age_mis = dmap[~dmap.same_age & dmap.human_dev_donor.ne("")]
+    has = dmap.human_dev_donor.ne("")
+    matched = int((dmap.same_chemistry & has).sum())
+    renamed = int((has & (dmap.cortex_donor != dmap.human_dev_donor)).sum())
+    excl = dmap[dmap.excluded_from_human_dev]
+    lost = dmap[~has & ~dmap.excluded_from_human_dev]
+    age_mis = dmap[~dmap.same_age & has]
+    # Does the cross-dataset join in csv_exports see the renamed donors?
+    out.used("_cross_dataset/label_overlap_donor.csv")
+    lo = C.csv("_cross_dataset", "label_overlap_donor.csv")
+    joined = int(lo["in_both"].astype(str).str.lower().eq("true").sum())
+    join_note = ("`13_cross_dataset_keys` joins them" if joined >= matched else
+                 f"`13_cross_dataset_keys` joins only {joined} -- exports predate its ID fix")
     f.append(
         f"**cortex is not an independent cohort.** {matched}/{len(dmap)} cortex donors are "
         f"human_dev donors ({renamed} under a differently written ID, e.g. "
-        "`XHU:1966:307` = `XHU:307`, which `13_cross_dataset_keys` does not join). "
-        "Agreement between the two files is reproducibility of processing, not replication."
+        f"`XHU:1966:307` = `XHU:307`; {join_note})."
+        + (f" The other {len(excl)} ({', '.join(excl.cortex_donor)}) fall under a human_dev "
+           "exclusion rule, so they have no human_dev counterpart in these exports."
+           if len(excl) else "")
+        + (f" {len(lost)} ({', '.join(lost.cortex_donor)}) have no human_dev match at all."
+           if len(lost) else "")
+        + " Agreement between the two files is reproducibility of processing, not replication."
         + (f" Age annotations disagree for {', '.join(age_mis.cortex_donor)} "
            f"({', '.join(f'{a:g} vs {b:g}' for a, b in zip(age_mis.age_cortex, age_mis.age_human_dev))} pcw)."
            if len(age_mis) else ""))

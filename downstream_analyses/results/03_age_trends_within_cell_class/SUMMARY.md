@@ -1,6 +1,6 @@
 # Within-cell-class gene expression across age
 
-_Generated 2026-10-04 05:56 UTC by `downstream_analyses/03_age_trends_within_cell_class.py` from `csv_exports/`._
+_Generated 2026-10-04 12:25 UTC by `downstream_analyses/03_age_trends_within_cell_class.py` from `csv_exports/`._
 
 ## Question
 
@@ -38,10 +38,10 @@ Holding cell identity fixed, which genes rise or fall across development, consis
 
 - **cortex (primary)**: replicated within-class age trends per class -- Neuroblast 61 up / 84 down of 3937 tested; Neuron 0 up / 2 down of 4558 tested; Neuronal IPC 50 up / 47 down of 4530 tested; Radial glia 179 up / 204 down of 4371 tested.
 - **human_dev (region-confounded, see limitations)**: replicated within-class age trends per class -- Erythrocyte 45 up / 31 down of 938 tested; Glioblast 76 up / 68 down of 8239 tested; Immune 72 up / 56 down of 6226 tested; Neuroblast 896 up / 674 down of 7040 tested; Neuron 891 up / 704 down of 6974 tested; Neuronal IPC 745 up / 494 down of 7705 tested; Radial glia 582 up / 532 down of 8032 tested; Vascular 183 up / 84 down of 7952 tested.
-- **cortex Neuroblast** -- strongest replicated, rising: NFIC, EIF1AX, PTPRD, MLLT3, EPHA5, USP46, RBBP4, TRIM2, SETD2, EIF4B, CALCOCO1, LINC01560, CEP170, TNRC6B, ATCAY; falling: REM2, CHST8, FBXO7, NNAT, EYA2, TMEM163, PUF60, CIAPIN1, PPA2, CREG2, CDKN1C, EBF1, KMT5C, PLPPR2, DUSP26.
-- **cortex Neuron** -- strongest replicated, rising: none; falling: BAD, MTCH1.
-- **cortex Neuronal IPC** -- strongest replicated, rising: SSX2IP, DCAF16, NFIC, FAM171B, SET, KIF18A, CCP110, AFF3, CEP350, MEGF9, CDC42BPA, HELLS, MMS22L, SUZ12, SCRN1; falling: NKAIN4, CD200, TAGLN3, DEDD2, PCBP4, PSMD4, PHLDB2, EIF4A1, BLOC1S4, NOVA2, ZBTB17, CCNJL, CCND1, DDIT4, CHN1.
-- **cortex Radial glia** -- strongest replicated, rising: SPAG9, NFIC, EIF2AK2, TSPO, KIF15, ITGA2, DESI2, UBXN2A, LYRM7, CKAP2, PPM1K, SSX2IP, FER, JAK1, LGALS1; falling: CDC23, HMGA2, FBL, CNTNAP2, HMGA1, CDK4, NCALD, NDUFS3, SNU13, MED22, CHAF1B, OGFOD1, BBS4, CENPM, PRMT1.
+- **cortex Neuroblast** -- strongest replicated, rising: NFIC, EIF1AX, MLLT3, PTPRD, EPHA5, USP46, RBBP4, TRIM2, EIF4B, CALCOCO1, SETD2, LINC01560, TNRC6B, CEP170, CCND2; falling: CHST8, REM2, FBXO7, NNAT, EYA2, TMEM163, PPA2, CIAPIN1, PUF60, CREG2, EBF1, CDKN1C, KMT5C, PLPPR2, PEPD.
+- **cortex Neuron** -- strongest replicated, rising: none; falling: MTCH1, BAD.
+- **cortex Neuronal IPC** -- strongest replicated, rising: SSX2IP, NFIC, DCAF16, FAM171B, SET, AFF3, CCP110, KIF18A, MEGF9, CEP350, CDC42BPA, SCRN1, MMS22L, HELLS, SUZ12; falling: NKAIN4, CD200, TAGLN3, DEDD2, PCBP4, PSMD4, PHLDB2, EIF4A1, BLOC1S4, NOVA2, ZBTB17, CCND1, CCNJL, DDIT4, CHN1.
+- **cortex Radial glia** -- strongest replicated, rising: NFIC, SPAG9, EIF2AK2, ITGA2, TSPO, KIF15, DESI2, UBXN2A, PPM1K, FER, SSX2IP, CKAP2, LYRM7, LGALS1, JAK1; falling: HMGA2, CDC23, FBL, CNTNAP2, HMGA1, NCALD, CDK4, OGFOD1, CHAF1B, NDUFS3, MED22, SNU13, BBS4, CENPM, PRMT1.
 - **Residual global drift after TMM** (median gene rho beyond +/-0.1) in cortex Radial glia (v2 -0.14, v3 +0.07); human_dev Erythrocyte (v2 -0.54, v3 +0.07). Trends there are partly a whole-transcriptome shift (in erythrocytes, haemoglobin taking over the transcriptome as they mature) -- prefer genes whose |rho| clearly exceeds that offset.
 - **NDD-panel genes with replicated trends in cortex**: CNTNAP2 down in Radial glia (asd_high_confidence|synaptic_and_channels); ASH1L up in Radial glia (asd_high_confidence|chromatin_transcription_regulators); CREBBP up in Neuronal IPC (asd_high_confidence|chromatin_transcription_regulators|id_dd_dominant); SLC2A1 down in Radial glia (epilepsy_dee); SLC2A1 down in Neuroblast (epilepsy_dee); CREBBP up in Neuroblast (asd_high_confidence|chromatin_transcription_regulators|id_dd_dominant); KAT6B up in Radial glia (id_dd_dominant). Full list: ndd_genes_with_age_trends.csv.
 - **cortex and human_dev agree on within-class trends** (Spearman of combined Z, shared classes): Neuroblast 0.60; Neuron 0.49; Neuronal IPC 0.62; Radial glia 0.61. Same donors, so this measures how much whole-brain pooling and processing change the answer -- not independent replication.
