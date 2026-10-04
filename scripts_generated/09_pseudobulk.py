@@ -38,9 +38,11 @@ import pandas as pd
 
 import config
 from lib import cli
-from lib.aggregate import GroupAggregator, combine_keys, group_codes
+from lib.aggregate import (GroupAggregator, combine_keys, drop_empty_levels,
+                           group_codes)
 from lib.io_utils import (Manifest, XReader, add_derived_obs_columns,
-                          chemistry_mask, gene_frame, log, read_obs, read_var,
+                          chemistry_mask, exclusion_mask, gene_frame, log,
+                          read_obs, read_var,
                           resolve_cluster_columns, resolve_role)
 from lib.panels import all_panel_genes
 
@@ -128,6 +130,8 @@ def run(key: str, args, chem: str | None = None,
         man.flush()
         return
     chem_keep = chem_keep.to_numpy()
+    excl_keep, _ = exclusion_mask(obs_full, key, within=chem_keep)
+    chem_keep = chem_keep & excl_keep
     if chem_keep.sum() == 0:
         log(f"  no cells with chemistry={chem}; skipping")
         man.flush()
@@ -168,17 +172,18 @@ def run(key: str, args, chem: str | None = None,
     est_bytes = 0
     for name, series in groupings.items():
         codes, levels = group_codes(series)
-        if len(levels) > config.MAX_GROUPS_WIDE:
-            log(f"  skipping grouping '{name}': {len(levels):,} levels exceeds "
-                f"MAX_GROUPS_WIDE={config.MAX_GROUPS_WIDE}")
-            skipped.append({"grouping": name, "n_levels": len(levels),
-                            "reason": "exceeds MAX_GROUPS_WIDE"})
-            continue
         # Excluding the other chemistry by code rather than by slicing X keeps
         # the single streaming pass intact; the aggregator skips code -1.
         codes = np.where(chem_keep, codes, -1)
         if (codes >= 0).sum() == 0:
             log(f"  skipping grouping '{name}': no cells left after the chemistry filter")
+            continue
+        codes, levels = drop_empty_levels(codes, levels)
+        if len(levels) > config.MAX_GROUPS_WIDE:
+            log(f"  skipping grouping '{name}': {len(levels):,} levels exceeds "
+                f"MAX_GROUPS_WIDE={config.MAX_GROUPS_WIDE}")
+            skipped.append({"grouping": name, "n_levels": len(levels),
+                            "reason": "exceeds MAX_GROUPS_WIDE"})
             continue
         aggs[name] = GroupAggregator(len(levels), n_kept, config.TARGET_SUM)
         codes_map[name], names_map[name] = codes, levels

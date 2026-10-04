@@ -42,7 +42,7 @@ import config
 from lib import cli
 from lib.bulk_stats import (cluster_quality, kmeans_clusters, silhouette_corr,
                             zscore_rows)
-from lib.io_utils import Manifest, log
+from lib.io_utils import Manifest, load_group_matrix, log
 from lib.panels import panel_long_frame
 
 SCRIPT = "16_expression_patterns"
@@ -54,13 +54,6 @@ K_EXPORT = [6, 9, 12]
 MIN_GROUPS = 4
 # Silhouette range across K below this means the sweep has no real optimum.
 FLAT_SILHOUETTE = 0.05
-
-
-def load_matrix(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path)
-    df = df.set_index(df.columns[0])
-    df.index.name = "gene"
-    return df.apply(pd.to_numeric, errors="coerce")
 
 
 def run(key: str, args, chem: str | None = None,
@@ -82,7 +75,7 @@ def run(key: str, args, chem: str | None = None,
         lambda s: "|".join(sorted(set(s)))).to_dict()
 
     for grouping in chosen:
-        expr = load_matrix(available[grouping]).dropna(how="all")
+        expr = load_group_matrix(available[grouping]).dropna(how="all")
         if expr.shape[1] < MIN_GROUPS:
             log(f"  skipping {grouping}: {expr.shape[1]} groups (<{MIN_GROUPS})")
             continue

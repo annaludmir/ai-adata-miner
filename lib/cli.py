@@ -43,6 +43,10 @@ def build_parser(description: str) -> argparse.ArgumentParser:
                         "'all' pools them into <dataset>/. Age and chemistry are "
                         "heavily confounded in these data, so pooled results mix a "
                         "developmental effect with the v2->v3 switch")
+    p.add_argument("--exclusions", default=None,
+                   help="CSV of cells to leave out (dataset,role,value,reason); "
+                        "'none' disables. Default: config.EXCLUSIONS_FILE "
+                        "(exclusions.csv, or $AIM_EXCLUSIONS)")
     return p
 
 
@@ -64,6 +68,8 @@ def dataset_variants(args):
     rather than only in a column -- means a downstream analysis cannot
     accidentally pool the two by globbing.
     """
+    if getattr(args, "exclusions", None):
+        config.EXCLUSIONS_FILE = args.exclusions
     for key in selected_datasets(args):
         for chem in chemistry_values(args):
             yield key, chem, config.namespace(key, chem)

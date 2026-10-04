@@ -8,11 +8,11 @@ multi-gigabyte `.h5ad` again.
 schemas/            stored + regenerated AnnData schemas
 config.py           dataset registry and semantic column roles
 lib/                io (h5ad -> frames), chunked aggregation, statistics, gene panels
-scripts_generated/  00-13, the extraction pipeline (steps 1 & 2)
+scripts_generated/  00-18, the extraction pipeline (steps 1 & 2)
 csv_exports/        CSV outputs, one folder per dataset, each with _manifest.csv
 panels/             drop real SFARI / DDG2P exports here to override the seed lists
 prompts/            system prompts driving step 3
-downstream_analyses/  step 3 outputs
+downstream_analyses/  step 3: analyses over the CSVs, results/ and REPORT.md
 running_scripts/    Slurm job scripts for powerslurm
 docs/               ANALYSIS_CATALOG.md -- what is extracted and what is possible
 ```
@@ -32,6 +32,23 @@ confounded with age (v2 ~6–10 pcw, v3 ~5–5.5 and 11.5–14). Analyses theref
 run **per chemistry by default**, into `csv_exports/<dataset>__v2/` and
 `__v3/`; `--chemistry all` pools them instead. Script 18 measures what the
 stratification costs — read it before interpreting anything.
+
+## Excluding cells
+
+`exclusions.csv` lists cells to leave out of every analysis, one rule per row:
+
+```
+dataset,role,value,reason
+human_dev,age,5.0,"File is human_dev_without_week_5 but still holds ... cells at 5.0 pcw"
+```
+
+`role` is a semantic role (`age`, `donor`, `sample`, `region`, ...) or a raw
+`.obs` column; `dataset` may be `*`. Ages match numerically, and donors match
+across the two files' ID styles. Every extraction step applies the rules, and
+script 01 records what each one removed in `01_overview/exclusions_applied.csv`.
+Step 3 re-applies the age, donor and sample rules to older exports. Use
+`--exclusions other.csv` (or `AIM_EXCLUSIONS=...` on the cluster) to swap the
+file, and `--exclusions none` to switch exclusions off.
 
 ## Running
 
@@ -69,6 +86,21 @@ python3 scripts_generated/09_pseudobulk.py --dataset human_dev --chunk-size 1000
 Scripts 00–08 and 13 read only `.obs` / `.var` / `.obsm` / `.varm` and finish in
 minutes. Script 09 is the long one: it streams `X` once and fills every grouping's
 aggregator in that single pass. Scripts 10 and 11 then work purely on 09's CSVs.
+
+## Step 3: downstream analyses
+
+Runs on CSVs only, so on a laptop, in under a minute:
+
+```bash
+./downstream_analyses/run_all.sh          # PYTHON=... to pick an interpreter
+```
+
+Findings land in [`downstream_analyses/REPORT.md`](downstream_analyses/REPORT.md),
+with per-analysis method, limitations and tables under `downstream_analyses/results/`.
+Start with `01_data_audit`: it sets out what the data can support (donors as the
+replicate unit, v2/v3 as independent donor sets, cortex as a subset of human_dev).
+[`downstream_analyses/README.md`](downstream_analyses/README.md) explains each
+analysis and how to add one.
 
 ## Design notes
 

@@ -51,6 +51,7 @@ aim_setup() {
   echo "dataset    : ${DATASET}"
   echo "chunk size : ${CHUNK_SIZE}"
   echo "chemistry  : ${CHEMISTRY}"
+  echo "exclusions : ${AIM_EXCLUSIONS:-${AIM_ROOT}/exclusions.csv}"
   [[ -n "$LIMIT_CELLS" ]] && echo "LIMIT_CELLS: ${LIMIT_CELLS}  (SMOKE TEST -- results are partial)"
   echo "started    : $(date '+%F %T')"
   echo "=============================================================="

@@ -17,6 +17,11 @@ REPO_ROOT = Path(__file__).resolve().parent
 DATA_ROOT = Path(os.environ.get(
     "AI_ADATA_DATA_ROOT", "/miridan-data/annaludmir/ndd_gene_modules/data"))
 CSV_EXPORTS = Path(os.environ.get("AI_ADATA_OUT_ROOT", REPO_ROOT / "csv_exports"))
+
+# Cells left out of every analysis: one rule per row (dataset, role, value,
+# reason) in exclusions.csv. Override with AIM_EXCLUSIONS=<path> or the
+# --exclusions flag; the value 'none' disables exclusions entirely.
+EXCLUSIONS_FILE = os.environ.get("AIM_EXCLUSIONS", str(REPO_ROOT / "exclusions.csv"))
 SCHEMA_DIR = REPO_ROOT / "schemas"
 
 # ---------------------------------------------------------------------------

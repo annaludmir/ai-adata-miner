@@ -45,6 +45,24 @@ def group_codes(values: pd.Series) -> tuple[np.ndarray, list[str]]:
     return codes, [str(c) for c in cat.categories]
 
 
+def drop_empty_levels(codes: np.ndarray, levels: list[str]
+                      ) -> tuple[np.ndarray, list[str]]:
+    """Re-code so only levels with at least one kept cell remain.
+
+    Levels come from the whole file, but a chemistry stratum masks the other
+    chemistry's cells to -1; without this, every age, donor or sample that
+    exists only in the other chemistry is exported as an all-zero column.
+    """
+    codes = np.asarray(codes, dtype=np.int64)
+    present = np.unique(codes[codes >= 0])
+    if len(present) == len(levels):
+        return codes, levels
+    remap = np.full(len(levels), -1, dtype=np.int64)
+    remap[present] = np.arange(len(present))
+    new = np.where(codes >= 0, remap[np.clip(codes, 0, None)], -1)
+    return new, [levels[i] for i in present]
+
+
 def onehot_csr(codes: np.ndarray, n_groups: int) -> sp.csr_matrix:
     """(n_cells x n_groups) indicator matrix; rows with code -1 are all-zero."""
     codes = np.asarray(codes, dtype=np.int64)

@@ -33,8 +33,8 @@ import pandas as pd
 
 import config
 from lib import cli
-from lib.io_utils import (Manifest, add_derived_obs_columns, log, read_obs,
-                          resolve_role)
+from lib.io_utils import (Manifest, add_derived_obs_columns, exclusion_mask, log,
+                          read_obs, resolve_role)
 
 SCRIPT = "18_chemistry_comparability"
 SUBDIR = "18_chemistry"
@@ -77,6 +77,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     obs = add_derived_obs_columns(read_obs(path), key)
     if args.limit_cells:
         obs = obs.iloc[:args.limit_cells]
+    obs = obs.loc[exclusion_mask(obs, key)[0]]
     chem_col = resolve_role(obs, "chemistry")
     if chem_col is None:
         log("  no chemistry column in this file; nothing to compare")
