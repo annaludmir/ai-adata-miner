@@ -170,7 +170,10 @@ def main() -> None:
 
     # ---- B: NDD genes among age-trending genes --------------------------------
     tr_path = C.RESULTS / "03_age_trends_within_cell_class" / "age_trends_combined.csv"
-    tr = pd.read_csv(C.require(tr_path))
+    # tier and panels are mostly empty strings; read them as text, not guessed types
+    tr = pd.read_csv(C.require(tr_path), low_memory=False,
+                     dtype={"tier": str, "panels": str})
+    tr[["tier", "panels"]] = tr[["tier", "panels"]].fillna("")
     out.used("results/03_age_trends_within_cell_class/age_trends_combined.csv")
     ndd_all = pd.concat(ndd_by_ns.values())[["panel", "gene"]].drop_duplicates()
     # Highly expressed genes are estimated more precisely and so reach
@@ -216,23 +219,35 @@ def main() -> None:
               "expression-matched random sets (hypergeometric shown for comparison)")
 
     # ---- C: GSEA consolidated ---------------------------------------------------
-    gs_rows = []
+    # Optional: parts A, B and D do not depend on it, so a missing 17_gsea output
+    # (stage 3 unfinished, or 17 skipped a stratum) skips C instead of the analysis.
+    gs_rows, gsea_missing = [], []
     for ds in C.DATASETS:
         res = {}
         for chem in C.CHEMISTRIES:
             n = C.ns(ds, chem)
+            p = C.EXPORTS / n / "17_gsea" / "gsea_results.csv"
+            if not p.exists():
+                gsea_missing.append(n)
+                continue
             out.used(f"{n}/17_gsea/gsea_results.csv")
-            res[chem] = C.csv(n, "17_gsea/gsea_results.csv")
+            res[chem] = pd.read_csv(p)
+        if len(res) < 2:
+            continue
         key = ["grouping", "group", "panel_group", "panel"]
         m = res["v2"].merge(res["v3"], on=key, suffixes=("_v2", "_v3"))
         m["significant_both"] = m.significant_v2.astype(bool) & m.significant_v3.astype(bool)
         m.insert(0, "dataset", ds)
         gs_rows.append(m[key + ["dataset", "nes_v2", "fdr_bh_v2", "nes_v3", "fdr_bh_v3",
                                 "significant_v2", "significant_v3", "significant_both"]])
-    gsea = pd.concat(gs_rows, ignore_index=True)
-    out.write(gsea[gsea.significant_v2.astype(bool) | gsea.significant_v3.astype(bool)],
-              "gsea_panel_enrichment_by_chemistry",
-              "17_gsea enrichments significant in either chemistry, with the other alongside")
+    if gsea_missing:
+        C.log(f"  WARNING: no 17_gsea/gsea_results.csv for {', '.join(gsea_missing)} -- "
+              "part C covers only datasets with both chemistries present")
+    gsea = pd.concat(gs_rows, ignore_index=True) if gs_rows else pd.DataFrame()
+    if not gsea.empty:
+        out.write(gsea[gsea.significant_v2.astype(bool) | gsea.significant_v3.astype(bool)],
+                  "gsea_panel_enrichment_by_chemistry",
+                  "17_gsea enrichments significant in either chemistry, with the other alongside")
 
     # ---- D: per-gene specificity agreement -------------------------------------
     spec_rows = []
@@ -310,13 +325,18 @@ def main() -> None:
                                  f"{r.genes.replace('|', ', ')})"
                                  for r in sig.head(MAX_LISTED).itertuples())
                      + (f" (+{len(sig) - MAX_LISTED} more)" if len(sig) > MAX_LISTED else "") + ".")
-    both = gsea[gsea.significant_both & (gsea.panel_group == "ndd")]
-    f.append("**GSEA (17) NDD enrichments significant in both chemistries**: "
-             + ("; ".join(f"{r.dataset} {r.panel} in {r.group} ({r.grouping})"
-                          for r in both.itertuples()) if len(both) else "none")
-             + f". Across all panels: {int(gsea.significant_both.sum())} of "
-             f"{int((gsea.significant_v2.astype(bool) | gsea.significant_v3.astype(bool)).sum())} "
-             "enrichments significant in either chemistry hold in both.")
+    if gsea_missing:
+        f.append(f"**GSEA (17) results missing for {', '.join(gsea_missing)}**: part C "
+                 + ("skipped entirely" if gsea.empty else "covers only the other dataset")
+                 + ". Re-run stage 3 (slurm_03_derived.sh), then this analysis.")
+    if not gsea.empty:
+        both = gsea[gsea.significant_both & (gsea.panel_group == "ndd")]
+        f.append("**GSEA (17) NDD enrichments significant in both chemistries**: "
+                 + ("; ".join(f"{r.dataset} {r.panel} in {r.group} ({r.grouping})"
+                              for r in both.itertuples()) if len(both) else "none")
+                 + f". Across all panels: {int(gsea.significant_both.sum())} of "
+                 f"{int((gsea.significant_v2.astype(bool) | gsea.significant_v3.astype(bool)).sum())} "
+                 "enrichments significant in either chemistry hold in both.")
     if not spec.empty:
         agree = spec.groupby("dataset").same_top_class.mean()
         f.append("**Per-gene cell-class specificity is chemistry-robust for NDD genes**: "
