@@ -48,8 +48,11 @@ DATASETS: dict[str, dict] = {
         "expected_n_vars": 33_538,
     },
     "human_dev": {
-        "h5ad": DATA_ROOT / "human_dev_without_week_5.h5ad",
-        "label": "Whole developing human brain atlas (week 5 removed)",
+        # The cell-cycle-annotated version: same atlas plus per-cell
+        # CellCyclePhase (G1/S/G2M/Post-M/Non-cycling), cycling_score and
+        # Age_Chemistry. The plain human_dev_without_week_5.h5ad lacks these.
+        "h5ad": DATA_ROOT / "human_dev_without_week_5_cc_annotated.h5ad",
+        "label": "Whole developing human brain atlas (cell-cycle annotated)",
         "schema": SCHEMA_DIR / "human_dev_schema.json",
         # var index holds VERSIONED Ensembl accessions here (ENSG...*.N)
         "gene_id_space": "accession_versioned",

@@ -1,6 +1,6 @@
 # Data audit: what the exports can support
 
-_Generated 2026-10-05 08:03 UTC by `downstream_analyses/01_data_audit.py` from `csv_exports/`._
+_Generated 2026-10-05 10:57 UTC by `downstream_analyses/01_data_audit.py` from `csv_exports/`._
 
 ## Question
 
@@ -53,7 +53,7 @@ Before any biology: how many independent units stand behind each comparison, whi
 - **Sex is unevenly spread over age** in cortex__v2 (male ages 6.9|8, female ages 7.5|8.5|9.2|9.5|10; rho = -0.63, exact p = 0.19); cortex__v3 (male ages 6.9|12|14, female ages 5|5.5|6.9|11.5|13.25; rho = 0.45, exact p = 0.29). With this few donors the association is not significant, but it does not need to be to matter: a sex-differential gene can look like an age trend. Later analyses flag sex-linked genes and check trends against sex.
 - **Sex-linked genes rank among cell-class markers**, which happens when a class is drawn unevenly from male and female donors: RPS4Y1 in Radial glia (cortex__v2, rank 10); RPS4Y1 in Radial glia (human_dev__v2, rank 34); EIF1AY in Erythrocyte (human_dev__v3, rank 43). See cell_class_sex_balance.csv for the imbalance behind each.
 - **Cell-class labels recover known markers**: 20/30 seed marker panels score highest in the class they name. Misses: radial_glia->Glioblast (cortex__v2), neuroblast->Neuron (cortex__v3), radial_glia->Glioblast (cortex__v3), glioblast_opc->Oligo (human_dev__v2), neuron->Placodes (human_dev__v2), oligo->Neural crest (human_dev__v2), radial_glia->Glioblast (human_dev__v2), glioblast_opc->Oligo (human_dev__v3), oligo->Neural crest (human_dev__v3), radial_glia->Glioblast (human_dev__v3). Panels naming a class absent from a stratum are not scored. The misses are neighbouring lineages: glioblasts carry radial-glia genes, placode-derived sensory neurons carry pan-neuronal genes, and the short seed lists cannot separate them.
-- **Exclusions (exclusions.csv)**: human_dev age=5.0 (File is human_dev_without_week_5 but still holds 62,786 cells at 5.0 pcw (donor XDD:348)); human_dev age=5.5 (File is human_dev_without_week_5 but still holds 59,667 cells at 5.5 pcw (donor XDD:400)). These exports already omit them.
+- **Exclusions (exclusions.csv)**: human_dev age=5.0 (The 'without_week_5' file still holds cells at 5.0 pcw (donor XDD:348; 62,786 cells)); human_dev age=5.5 (The 'without_week_5' file still holds cells at 5.5 pcw (donor XDD:400; 59,667 cells)). These exports already omit them.
 - **XIST reads ~6.1x higher in human_dev than in cortex for the same female donors**, so the two files probably count reads differently (XIST is largely nuclear and intronic). Compare genes across the files by rank or within-file contrast, not by absolute level.
 
 ## Limitations

@@ -1,6 +1,6 @@
 # Cell-cycle programmes: proliferation over development and a phase map of genes
 
-_Generated 2026-10-05 08:04 UTC by `downstream_analyses/09_cell_cycle_programs.py` from `csv_exports/`._
+_Generated 2026-10-05 10:57 UTC by `downstream_analyses/09_cell_cycle_programs.py` from `csv_exports/`._
 
 ## Question
 

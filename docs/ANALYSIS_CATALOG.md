@@ -81,7 +81,9 @@ WGCNA-style co-expression modules with preservation across donor sets, hub
 genes, age dynamics, list enrichment and seed-panel labels (08); cell-cycle
 programs, covering proliferation and G1/S/G2M shares over development, a gene
 phase map, gene-set phase profiles, and list age trends with proliferation
-genes set aside (09).
+genes set aside (09); splicing dynamics from script 12's spliced/unspliced
+pseudobulks, covering where genes and lists are being switched on or off along
+the lineage, and unspliced-share age trends joined with expression trends (10).
 
 These all run off `csv_exports/`. Discover inputs via `csv_exports/<dataset>/_manifest.csv`.
 

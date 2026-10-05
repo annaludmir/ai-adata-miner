@@ -1,6 +1,6 @@
 # Step 3 report: downstream analyses
 
-_Built 2026-10-05 08:04 UTC from 9 analyses over `csv_exports/`._
+_Built 2026-10-05 10:57 UTC from 10 analyses over `csv_exports/`._
 
 Read this first. Three facts about the data constrain every result below
 (details in 01):
@@ -28,6 +28,7 @@ Read this first. Three facts about the data constrain every result below
 - [07. Gene-list co-expression: do list genes work as a group?](#07-gene-list-co-expression-do-list-genes-work-as-a-group)
 - [08. Co-expression modules across fine clusters](#08-co-expression-modules-across-fine-clusters)
 - [09. Cell-cycle programmes: proliferation over development and a phase map of genes](#09-cell-cycle-programmes-proliferation-over-development-and-a-phase-map-of-genes)
+- [10. Splicing dynamics: where and when genes are being switched on or off](#10-splicing-dynamics-where-and-when-genes-are-being-switched-on-or-off)
 
 ## 01. Data audit: what the exports can support
 
@@ -41,7 +42,7 @@ Read this first. Three facts about the data constrain every result below
 - **Sex is unevenly spread over age** in cortex__v2 (male ages 6.9|8, female ages 7.5|8.5|9.2|9.5|10; rho = -0.63, exact p = 0.19); cortex__v3 (male ages 6.9|12|14, female ages 5|5.5|6.9|11.5|13.25; rho = 0.45, exact p = 0.29). With this few donors the association is not significant, but it does not need to be to matter: a sex-differential gene can look like an age trend. Later analyses flag sex-linked genes and check trends against sex.
 - **Sex-linked genes rank among cell-class markers**, which happens when a class is drawn unevenly from male and female donors: RPS4Y1 in Radial glia (cortex__v2, rank 10); RPS4Y1 in Radial glia (human_dev__v2, rank 34); EIF1AY in Erythrocyte (human_dev__v3, rank 43). See cell_class_sex_balance.csv for the imbalance behind each.
 - **Cell-class labels recover known markers**: 20/30 seed marker panels score highest in the class they name. Misses: radial_glia->Glioblast (cortex__v2), neuroblast->Neuron (cortex__v3), radial_glia->Glioblast (cortex__v3), glioblast_opc->Oligo (human_dev__v2), neuron->Placodes (human_dev__v2), oligo->Neural crest (human_dev__v2), radial_glia->Glioblast (human_dev__v2), glioblast_opc->Oligo (human_dev__v3), oligo->Neural crest (human_dev__v3), radial_glia->Glioblast (human_dev__v3). Panels naming a class absent from a stratum are not scored. The misses are neighbouring lineages: glioblasts carry radial-glia genes, placode-derived sensory neurons carry pan-neuronal genes, and the short seed lists cannot separate them.
-- **Exclusions (exclusions.csv)**: human_dev age=5.0 (File is human_dev_without_week_5 but still holds 62,786 cells at 5.0 pcw (donor XDD:348)); human_dev age=5.5 (File is human_dev_without_week_5 but still holds 59,667 cells at 5.5 pcw (donor XDD:400)). These exports already omit them.
+- **Exclusions (exclusions.csv)**: human_dev age=5.0 (The 'without_week_5' file still holds cells at 5.0 pcw (donor XDD:348; 62,786 cells)); human_dev age=5.5 (The 'without_week_5' file still holds cells at 5.5 pcw (donor XDD:400; 59,667 cells)). These exports already omit them.
 - **XIST reads ~6.1x higher in human_dev than in cortex for the same female donors**, so the two files probably count reads differently (XIST is largely nuclear and intronic). Compare genes across the files by rank or within-file contrast, not by absolute level.
 
 Method, limitations and output files: [results/01_data_audit/SUMMARY.md](results/01_data_audit/SUMMARY.md)
@@ -173,4 +174,17 @@ Method, limitations and output files: [results/08_coexpression_modules/SUMMARY.m
 - **human_dev: gene sets tied to proliferation, replicated** -- seed:g2m_phase proliferative (rho +0.81/+0.78 vs +0.04 matched); seed:s_phase proliferative (rho +0.75/+0.71 vs +0.06 matched); seed:asd_high_confidence anti-proliferative (rho -0.26/-0.26 vs -0.03 matched); seed:epilepsy_dee anti-proliferative (rho -0.24/-0.24 vs +0.03 matched); seed:synaptic_and_channels anti-proliferative (rho -0.48/-0.45 vs -0.04 matched).
 
 Method, limitations and output files: [results/09_cell_cycle_programs/SUMMARY.md](results/09_cell_cycle_programs/SUMMARY.md)
+
+## 10. Splicing dynamics: where and when genes are being switched on or off
+
+**Question.** In which cell classes are genes and gene sets being switched on or off (nascent vs mature RNA), and inside a class, is their unspliced share rising or falling with age alongside their expression?
+
+- **Induction scores reproduce across donor sets** (Spearman v2 vs v3 per class): Glioblast 0.59, Neuroblast 0.57, Neuron 0.71, Neuronal IPC 0.53, Radial glia 0.54. Low values would mean the unspliced signal is noise at this depth.
+- **Where gene sets are being switched on or off along the lineage** (replicated; + = more nascent RNA than their mRNA explains) -- seed:s_phase being switched off in Radial glia (-3.2/-5.4 null SDs); seed:s_phase being switched on in Neuronal IPC (+4.5/+2.3 null SDs); seed:g2m_phase being switched off in Radial glia (-4.8/-2.0 null SDs); seed:g2m_phase being switched on in Glioblast (+4.0/+2.0 null SDs); seed:epilepsy_dee being switched on in Neuronal IPC (+1.9/+1.9 null SDs); seed:asd_high_confidence being switched on in Radial glia (+1.7/+1.9 null SDs). Modules: CXw04 being switched on in Neuronal IPC; CXw02 being switched off in Radial glia; CXw01 being switched on in Radial glia; CXw02 being switched on in Glioblast; CXw01 being switched on in Glioblast; CX02 being switched on in Neuronal IPC; CX02 being switched on in Radial glia; CX01 being switched on in Glioblast.
+- **Genes by dynamics within classes** (unspliced-share trend and expression trend both replicated, or expression flat): Radial glia: 2 induction ahead of expression, 3 shut-down ahead of expression.
+- **Gene sets whose unspliced share changes with age inside a class** (replicated) -- seed:s_phase unspliced share rises in Radial glia (mean rho +0.33/+0.28); seed:g2m_phase unspliced share rises in Neuronal IPC (mean rho +0.24/+0.38); seed:asd_high_confidence unspliced share falls in Neuroblast (mean rho -0.13/-0.16); seed:chromatin_transcription_regulators unspliced share falls in Neuroblast (mean rho -0.11/-0.16). Read with 06/09: a list rising with age whose unspliced share also rises is being actively induced; one whose unspliced share is flat is accumulating mRNA.
+- **Level coupling removed**: across groups, a gene's log U/S falls as its expression rises (pooled within-gene slope per log2 CPM: v2 cell_class -0.125, v3 cell_class -0.196, v2 cell_class_x_age +0.010, v3 cell_class_x_age -0.035); scores above are net of it, and genes are compared only where clearly on.
+- **Overall unspliced level vs age** (removed before every test above; Spearman): Glioblast +0.54/-0.80, Neuroblast +0.36/+0.71, Neuron +0.39/+1.00, Neuronal IPC +0.36/+0.64, Radial glia +0.43/+0.64.
+
+Method, limitations and output files: [results/10_splicing_dynamics/SUMMARY.md](results/10_splicing_dynamics/SUMMARY.md)
 

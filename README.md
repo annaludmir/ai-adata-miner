@@ -22,7 +22,7 @@ docs/               ANALYSIS_CATALOG.md -- what is extracted and what is possibl
 | key | file | cells × genes |
 |---|---|---|
 | `cortex` | `Cortex_EMX1_louvain3_passedQC_PostM_rev1.h5ad` | 297,927 × 33,538 |
-| `human_dev` | `human_dev_without_week_5.h5ad` | 1,665,937 × 59,459 |
+| `human_dev` | `human_dev_without_week_5_cc_annotated.h5ad` | 1,665,937 × 59,459 |
 
 Paths resolve through `config.py`; override with `AI_ADATA_DATA_ROOT` and
 `AI_ADATA_OUT_ROOT`.
@@ -39,7 +39,7 @@ stratification costs — read it before interpreting anything.
 
 ```
 dataset,role,value,reason
-human_dev,age,5.0,"File is human_dev_without_week_5 but still holds ... cells at 5.0 pcw"
+human_dev,age,5.0,"The 'without_week_5' file still holds cells at 5.0 pcw (donor XDD:348; 62,786 cells)"
 ```
 
 `role` is a semantic role (`age`, `donor`, `sample`, `region`, ...) or a raw

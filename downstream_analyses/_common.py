@@ -740,6 +740,27 @@ def mapped_lists(dataset: str, collapse: bool = True) -> dict[str, list[str]]:
     return _MAPPED_CACHE[key]
 
 
+def analysis_gene_sets(dataset: str, groups=("ndd", "cell_cycle"),
+                       modules: bool = True, out=None) -> dict[str, list[str]]:
+    """Gene sets most analyses profile: user lists (GWAS lists collapsed per
+    locus), seed panels of the given groups, and robust 08 modules."""
+    sets = {f"list:{k}": v for k, v in mapped_lists(dataset).items()} if gene_lists() else {}
+    n = ns(dataset, "v2")
+    if out is not None:
+        out.used(f"{n}/11_panels/panel_coverage.csv")
+    pan = panels(n)
+    for (_, pname), g in pan[pan.panel_group.isin(list(groups))].groupby(["panel_group", "panel"]):
+        sets[f"seed:{pname}"] = list(g.gene)
+    mod_path = RESULTS / "08_coexpression_modules" / "modules.csv"
+    if modules and mod_path.exists():
+        if out is not None:
+            out.used("results/08_coexpression_modules/modules.csv")
+        mods = pd.read_csv(mod_path)
+        for r in mods[(mods.dataset == dataset) & mods.robust].itertuples():
+            sets[f"module:{r.module}"] = r.genes.split("|")
+    return sets
+
+
 # ---------------------------------------------------------------------------
 # co-expression across fine clusters
 # ---------------------------------------------------------------------------
