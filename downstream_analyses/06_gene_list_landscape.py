@@ -273,7 +273,7 @@ def main() -> None:
     if len(col):
         f.append(f"**GWAS-style lists collapsed to one gene per locus** (name matches "
                  f"'{C.COLLAPSE_PATTERN}'; neighbours within {C.LOCUS_WINDOW / 1e6:g} Mb chain into "
-                 "one locus, first-listed gene kept): "
+                 "one locus, its most expressed gene kept): "
                  + "; ".join(f"{r.gene_list} ({r.dataset}) {r.n_genes} genes -> {r.n_loci} loci"
                              + (f", largest {r.largest_locus_size} genes ({r.largest_locus})"
                                 if r.largest_locus_size > 2 else "")
@@ -341,8 +341,11 @@ def main() -> None:
          "over through the shared Ensembl id -- the files use different symbol versions).",
          f"Lists whose name matches '{C.COLLAPSE_PATTERN}' (AIM_COLLAPSE_LISTS) keep one gene "
          f"per locus -- genes on one chromosome chained within {C.LOCUS_WINDOW / 1e6:g} Mb, the "
-         "first-listed kept -- in every analysis here and in 07/08: a GWAS hit names all its "
-         "neighbours, which are often co-regulated (e.g. the 6p22 histone cluster).",
+         "most expressed member kept (GWAS lists are usually sorted by position, so the "
+         "first-listed gene is arbitrary and often non-coding; nulls match on expression, so "
+         "this choice does not bias the tests) -- in every analysis here and in 07/08: a GWAS "
+         "hit names all its neighbours, which are often co-regulated (e.g. the 6p22 histone "
+         "cluster).",
          "Overlap: hypergeometric against genes detected in human_dev (plus all set "
          "members), BH across pairs.",
          "Cell-class preference: as 04 part A -- log2 TMM-CPM per (class, age point), gene "

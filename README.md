@@ -71,8 +71,9 @@ GWAS-derived lists name every gene near an associated variant, and neighbouring
 genes are often co-regulated. In one bipolar list, 16 histones from the 6p22
 cluster made the whole list look like a cell-division program. So in step 3,
 lists whose name contains `GWAS` keep one gene per locus: genes on one
-chromosome within 1 Mb of each other chain into a single locus, and the gene
-listed first is kept. `AIM_COLLAPSE_LISTS=<regex>` changes which lists this
+chromosome within 1 Mb of each other chain into a single locus, and its most
+highly expressed gene is kept. Position in the file is no guide here, because
+GWAS lists are usually sorted by coordinate. `AIM_COLLAPSE_LISTS=<regex>` changes which lists this
 applies to, and `none` turns it off. 06 reports every list's multi-gene loci.
 
 Step 3 matches list genes in four ways: exact symbol, case-insensitive symbol,

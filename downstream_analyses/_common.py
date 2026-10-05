@@ -653,7 +653,8 @@ def map_genes(genes, dataset: str) -> pd.DataFrame:
 # GWAS-derived lists name every gene near an associated variant, so one locus
 # can contribute many co-regulated neighbours (16 HIST1 histones at 6p22 in a
 # bipolar list made it look "mitotic"). Lists whose name matches this regex are
-# collapsed to one gene per locus; 'none' disables. Curated lists are not.
+# collapsed to one gene per locus, represented by its most expressed member;
+# 'none' disables. Curated lists are not collapsed.
 COLLAPSE_PATTERN = os.environ.get("AIM_COLLAPSE_LISTS", "GWAS")
 LOCUS_WINDOW = 1_000_000    # genes within this distance (bp) chain into one locus
 _COORDS: dict[str, pd.DataFrame] = {}
@@ -664,13 +665,30 @@ def collapses(name: str) -> bool:
             and re.search(COLLAPSE_PATTERN, name, flags=re.IGNORECASE) is not None)
 
 
+_LEVEL: dict[str, pd.Series] = {}
+
+
+def gene_level(dataset: str) -> pd.Series:
+    """Mean CPM per gene over a dataset's cell classes and both chemistries."""
+    if dataset not in _LEVEL:
+        parts = []
+        for chem in CHEMISTRIES:
+            cnt = group_matrix(ns(dataset, chem), "cell_class", "pseudobulk_counts")
+            parts.append((cnt.div(cnt.sum(axis=0), axis=1) * 1e6).mean(axis=1))
+        _LEVEL[dataset] = pd.concat(parts, axis=1).mean(axis=1)
+    return _LEVEL[dataset]
+
+
 def gene_loci(symbols: list[str], dataset: str) -> pd.DataFrame:
     """Group genes into loci by position: same chromosome, chained within LOCUS_WINDOW.
 
-    Returns symbol, chromosome, start, end, locus id, genes in the locus, and
-    whether the gene represents its locus (the first in the given order --
-    lists usually put the lead gene first). Genes without coordinates are
-    their own locus.
+    Returns symbol, chromosome, start, end, locus id, genes in the locus, mean
+    CPM, and whether the gene represents its locus: the most highly expressed
+    member -- the gene these data measure best. Position in the file is no
+    guide: GWAS lists are typically sorted by coordinate, so "first listed"
+    means "leftmost", often a non-coding gene the data cannot see. Every null
+    in 06-08 matches on expression level, so this choice does not bias the
+    tests. Genes without coordinates are their own locus.
     """
     if dataset not in _COORDS:
         g = csv("_cross_dataset", "gene_id_map.csv", low_memory=False)
@@ -697,8 +715,9 @@ def gene_loci(symbols: list[str], dataset: str) -> pd.DataFrame:
         next_id += 1
         df.loc[i, "locus"] = next_id
     df["genes_in_locus"] = df.groupby("locus")["symbol"].transform("size")
-    first = df.sort_values("order").drop_duplicates("locus").index
-    df["representative"] = df.index.isin(first)
+    df["mean_cpm"] = df["symbol"].map(gene_level(dataset)).fillna(0.0)
+    best = df.sort_values(["mean_cpm", "order"], ascending=[False, True]).drop_duplicates("locus").index
+    df["representative"] = df.index.isin(best)
     return df.sort_values("order").drop(columns="order")
 
 
