@@ -1,6 +1,6 @@
 # Step 3 report: downstream analyses
 
-_Built 2026-10-05 07:26 UTC from 9 analyses over `csv_exports/`._
+_Built 2026-10-05 08:04 UTC from 9 analyses over `csv_exports/`._
 
 Read this first. Three facts about the data constrain every result below
 (details in 01):
@@ -164,6 +164,7 @@ Method, limitations and output files: [results/08_coexpression_modules/SUMMARY.m
 - **cortex: proliferation over development in progenitors** -- fraction cycling falls with age in Radial glia (0.88->0.763 in v2, 0.746->0.6 in v3; replicated).
 - **human_dev: no replicated proliferation trend in progenitors.**
 - **G1 lengthening not testable yet**: phase fractions per cell class x age are exported by script 03 from this version on; re-run stage 1 to add them.
+- **Radial-glia sub-types not available yet**: script 19 (stage 2) exports oRG vs vRG calls; re-run stage 2 to add them.
 - **cortex gene phase map** (10,439 genes): 2323 proliferative (251 lean S, 397 lean G2/M), 2342 anti-proliferative, 2292 cycle-independent.
 - **human_dev gene phase map** (12,018 genes): 3129 proliferative, 2903 anti-proliferative, 2655 cycle-independent.
 - **Sanity check against the seed phase panels** (partly circular: phase calls come from such genes): cortex g2m_phase: lean -16.3/-18.2 null SDs (+ = S), 0 S / 47 G2/M genes; cortex s_phase: lean +12.1/+12.0 null SDs (+ = S), 33 S / 0 G2/M genes.

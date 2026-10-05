@@ -46,10 +46,10 @@ That submits a four-stage chain:
 ```
 stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
    |
-   +--> stage 2  pseudobulk cortex v2    128G  6h  scripts 09, 12  ─┐
-   +--> stage 2  pseudobulk cortex v3    128G  6h  scripts 09, 12  ─┤ all
-   +--> stage 2  pseudobulk human_dev v2 128G  6h  scripts 09, 12  ─┤ concurrent
-   +--> stage 2  pseudobulk human_dev v3 128G  6h  scripts 09, 12  ─┘
+   +--> stage 2  pseudobulk cortex v2    128G  6h  scripts 09,12,19─┐
+   +--> stage 2  pseudobulk cortex v3    128G  6h  scripts 09,12,19─┤ all
+   +--> stage 2  pseudobulk human_dev v2 128G  6h  scripts 09,12,19─┤ concurrent
+   +--> stage 2  pseudobulk human_dev v3 128G  6h  scripts 09,12,19─┘
    |
    v  (afterok on all four)
 stage 3  derived analyses              16G   3h   scripts 10,11,14-17

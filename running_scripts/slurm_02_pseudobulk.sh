@@ -48,5 +48,6 @@ echo "top genes  : ${TOP_GENES}"
 
 aim_run 09_pseudobulk --top-genes "$TOP_GENES"
 aim_run 12_splicing_layers     # needs spliced/unspliced layers -- cortex only
+aim_run 19_rg_subtypes         # oRG vs vRG per radial-glia cell; reads 09's gene selection
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1

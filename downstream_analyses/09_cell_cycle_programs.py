@@ -12,6 +12,11 @@ Questions
   C. Do the gene lists that rise with age inside progenitors (06) still rise
      when proliferation-linked genes are set aside? If progenitors cycle less
      later on, genes of non-cycling cells would rise for that reason alone.
+  D. Radial-glia sub-types (script 19: outer vs ventricular, per cell): does
+     the oRG share rise with age; how do each sub-type's cycling and phase
+     shares change; do oRG and vRG differ in G2/M share at the same age; and
+     does the radial-glia G2/M trend hold at a fixed sub-type mix (also with
+     depth fixed, and threshold-free by oRG-score quintile)?
 
 Data: cortex carries a per-cell phase call (G1 / S / G2M / Post-M /
 Non-cycling); human_dev only a continuous cell-cycle score. So the S-vs-G2/M
@@ -79,45 +84,133 @@ MAX_LISTED = 8
 # ---------------------------------------------------------------------------
 # A. proliferation over development
 # ---------------------------------------------------------------------------
-def depth_standardised_shares(dp: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """G1/S/G2M shares of cycling cells per class x age, compared at matched depth.
+def standardised_shares(df: pd.DataFrame, strata: list[str], label: str,
+                        class_col: str | None = "cell_class") -> dict[str, pd.DataFrame]:
+    """G1/S/G2M shares of cycling cells per (class x) age at a fixed mix of strata.
 
-    Phase calls come from marker expression and can drift with UMIs per cell,
-    which falls with age in cortex. Within each UMI quintile (quintiles are
-    per cell class, over all ages) the shares are computed separately, then
-    averaged with fixed weights -- each quintile's share of the class's cycling
-    cells over all ages -- so every age point is read at the same depth mix.
-    An age point needs quintiles covering >= MIN_DEPTH_WEIGHT of that weight,
-    each with >= MIN_BIN_CYCLING cycling cells. Also returns median UMIs per
-    cell per class x age, to show the depth drift itself.
+    Within each stratum (a UMI quintile, a radial-glia sub-type, ...) the
+    shares are computed separately, then averaged with fixed weights -- each
+    stratum's share of the class's cycling cells over all ages -- so every age
+    is read at the same mix. An age point needs strata covering >=
+    MIN_DEPTH_WEIGHT of the weight, each with >= MIN_BIN_CYCLING cycling cells.
     """
-    if not {"G1", "S", "G2M"} <= set(dp.columns):
+    if not {"G1", "S", "G2M"} <= set(df.columns):
         return {}
-    dp = dp.copy()
+    df = df.copy()
+    if class_col is None:
+        class_col = "_class"
+        df[class_col] = "Radial glia"
     for ph in ("G1", "S", "G2M"):
-        dp[f"n_{ph}"] = dp[ph].fillna(0) * dp.n_cells
-    dp["n_cyc"] = dp[["n_G1", "n_S", "n_G2M"]].sum(axis=1)
-    out = {f"{ph} share of cycling cells (depth-matched)": [] for ph in ("G1", "S", "G2M")}
-    out["median UMIs per cell"] = []
-    for cls, g in dp.groupby("cell_class"):
-        w = g.groupby("depth_bin")["n_cyc"].sum()
+        df[f"n_{ph}"] = df[ph].fillna(0) * df.n_cells
+    df["n_cyc"] = df[["n_G1", "n_S", "n_G2M"]].sum(axis=1)
+    out = {f"{ph} share of cycling cells ({label})": [] for ph in ("G1", "S", "G2M")}
+    for cls, g in df.groupby(class_col):
+        w = g.groupby(strata)["n_cyc"].sum()
         if w.sum() <= 0:
             continue
         w = w / w.sum()
         for age, h in g.groupby("age"):
-            out["median UMIs per cell"].append(
-                {"cell_class": cls, "age_pcw": age,
-                 "value": float(np.average(h.median_umis, weights=h.n_cells))})
-            h = h[h.n_cyc >= MIN_BIN_CYCLING].set_index("depth_bin")
+            h = h[h.n_cyc >= MIN_BIN_CYCLING].set_index(strata)
             cover = w.reindex(h.index).fillna(0)
             if cover.sum() < MIN_DEPTH_WEIGHT:
                 continue
             for ph in ("G1", "S", "G2M"):
                 share = h[f"n_{ph}"] / h["n_cyc"]
-                out[f"{ph} share of cycling cells (depth-matched)"].append(
+                out[f"{ph} share of cycling cells ({label})"].append(
                     {"cell_class": cls, "age_pcw": age,
                      "value": float((share * cover).sum() / cover.sum())})
     return {k: pd.DataFrame(v, columns=["cell_class", "age_pcw", "value"]) for k, v in out.items() if v}
+
+
+def depth_standardised_shares(dp: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Phase shares at a fixed UMI-quintile mix (phase calls drift with depth), plus
+    median UMIs per cell per class x age to show the drift itself."""
+    out = standardised_shares(dp, ["depth_bin"], "depth-matched")
+    umi = [{"cell_class": cls, "age_pcw": age,
+            "value": float(np.average(h.median_umis, weights=h.n_cells))}
+           for (cls, age), h in dp.groupby(["cell_class", "age"])]
+    if umi:
+        out["median UMIs per cell"] = pd.DataFrame(umi)
+    return out
+
+
+def rg_subtype_metrics(n: str, out: C.Output) -> dict[str, pd.DataFrame]:
+    """Radial-glia sub-type metrics from script 19 (oRG vs vRG), as trajectory inputs.
+
+    - oRG share of radial glia per age;
+    - per sub-type (cell_class 'oRG' / 'vRG'): cycling fraction and phase shares;
+    - radial-glia G1/S/G2M shares at a fixed sub-type mix, a fixed sub-type x
+      UMI-quintile mix, and a fixed oRG-score-quintile mix (threshold-free).
+      If the radial-glia G2/M rise survives these, it is change within cells,
+      not a shift towards oRG.
+    """
+    d = C.EXPORTS / n / "19_rg_subtypes"
+    metrics = {}
+    if not d.exists():
+        return metrics
+    p = d / "rg_subtype_by_age.csv"
+    if p.exists():
+        out.used(f"{n}/19_rg_subtypes/rg_subtype_by_age.csv")
+        t = pd.read_csv(p)
+        t = t[t.n_rg >= MIN_POINT_CELLS]
+        metrics["oRG share of radial glia"] = pd.DataFrame(
+            {"cell_class": "Radial glia", "age_pcw": t.age, "value": t.frac_oRG})
+    p = d / "rg_phase_by_subtype_x_age.csv"
+    if p.exists():
+        out.used(f"{n}/19_rg_subtypes/rg_phase_by_subtype_x_age.csv")
+        ph = pd.read_csv(p)
+        ph = ph[ph.subtype.isin(["oRG", "vRG"]) & (ph.n_cells >= MIN_POINT_CELLS)]
+        if {"G1", "S", "G2M"} <= set(ph.columns):
+            cyc = ph[["G1", "S", "G2M"]].sum(axis=1)
+            metrics["fraction cycling (sub-type)"] = pd.DataFrame(
+                {"cell_class": ph.subtype, "age_pcw": ph.age, "value": cyc})
+            ok = cyc * ph.n_cells >= MIN_CYCLING_CELLS
+            for phase in ("G1", "S", "G2M"):
+                metrics[f"{phase} share of cycling cells (sub-type)"] = pd.DataFrame(
+                    {"cell_class": ph.subtype[ok], "age_pcw": ph.age[ok],
+                     "value": (ph[phase] / cyc)[ok]})
+            metrics.update(standardised_shares(pd.read_csv(p), ["subtype"],
+                                               "fixed sub-type mix", class_col=None))
+    for fname, strata, label in (("rg_phase_by_subtype_x_age_x_depth.csv", ["subtype", "depth_bin"],
+                                  "fixed sub-type and depth mix"),
+                                 ("rg_phase_by_score_bin_x_age.csv", ["score_bin"],
+                                  "fixed oRG-score mix")):
+        p = d / fname
+        if p.exists():
+            out.used(f"{n}/19_rg_subtypes/{fname}")
+            metrics.update(standardised_shares(pd.read_csv(p), strata, label, class_col=None))
+    return metrics
+
+
+def subtype_g2m_difference(out: C.Output) -> pd.DataFrame:
+    """oRG minus vRG G2/M share of cycling cells, age point by age point."""
+    rows = []
+    for ds, chem in C.STRATA:
+        p = C.EXPORTS / C.ns(ds, chem) / "19_rg_subtypes" / "rg_phase_by_subtype_x_age.csv"
+        if not p.exists():
+            continue
+        ph = pd.read_csv(p)
+        if not {"G1", "S", "G2M"} <= set(ph.columns):
+            continue
+        ph["n_cyc"] = ph[["G1", "S", "G2M"]].sum(axis=1) * ph.n_cells
+        ph["g2m"] = ph.G2M * ph.n_cells / ph.n_cyc.replace(0, np.nan)
+        w = ph[ph.n_cyc >= MIN_CYCLING_CELLS].pivot(index="age", columns="subtype", values="g2m")
+        if not {"oRG", "vRG"} <= set(w.columns):
+            continue
+        w = w[["oRG", "vRG"]].dropna()
+        if len(w) < 3:
+            continue
+        diff = (w.oRG - w.vRG).to_numpy()
+        k = int((diff > 0).sum())
+        p_sign = float(min(1.0, 2 * C.stats.binom.cdf(min(k, len(diff) - k), len(diff), 0.5)))
+        rows.append({"dataset": ds, "chemistry": chem, "n_ages": len(diff),
+                     "mean_g2m_oRG": float(w.oRG.mean()), "mean_g2m_vRG": float(w.vRG.mean()),
+                     "mean_difference": float(diff.mean()), "ages_oRG_higher": k,
+                     "sign_test_p": p_sign})
+    df = pd.DataFrame(rows)
+    out.write(df, "rg_subtype_g2m_difference",
+              "oRG vs vRG: G2/M share of cycling cells compared age point by age point (sign test)")
+    return df
 
 
 def trajectories(out: C.Output) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -148,6 +241,7 @@ def trajectories(out: C.Output) -> tuple[pd.DataFrame, pd.DataFrame]:
         if dp_path.exists():
             out.used(f"{n}/03_cellcycle/phase_fractions_by_cell_class_x_age_x_depth.csv")
             metrics.update(depth_standardised_shares(pd.read_csv(dp_path)))
+        metrics.update(rg_subtype_metrics(n, out))
         for label, d in metrics.items():
             for cls, g in d.dropna().groupby("cell_class"):
                 g = g.sort_values("age_pcw")
@@ -447,6 +541,7 @@ def main() -> None:
     rng = np.random.default_rng(C.SEED)
 
     _, traj = trajectories(out)
+    sub_diff = subtype_g2m_difference(out)
     gene_map, mats = phase_map(out)
 
     # gene sets: user lists, seed NDD + cell-cycle panels, robust 08 modules
@@ -515,6 +610,38 @@ def main() -> None:
         if not any(m.startswith("G1 share") for m in traj.metric.unique()):
             f.append("**G1 lengthening not testable yet**: phase fractions per cell class x age are "
                      "exported by script 03 from this version on; re-run stage 1 to add them.")
+    if not traj.empty and traj.metric.str.contains("sub-type|oRG", regex=True).any():
+        for ds in C.DATASETS:
+            t = traj[traj.dataset == ds]
+            org = t[t.metric == "oRG share of radial glia"]
+            if org.empty:
+                continue
+            bits = [f"oRG share of radial glia {org.direction.iloc[0]} with age "
+                    f"({org.range_v2.iloc[0]} in v2, {org.range_v3.iloc[0]} in v3; "
+                    f"{org.tier.iloc[0] or 'not replicated'})"]
+            sub = t[t.metric.isin(["G2M share of cycling cells (sub-type)", "fraction cycling (sub-type)"])]
+            for r in sub.itertuples():
+                bits.append(f"{r.cell_class} {r.metric.replace(' (sub-type)', '')} {r.direction} "
+                            f"(rho {r.rho_v2:+.2f}/{r.rho_v3:+.2f}; {r.tier or 'n.s.'})")
+            raw = t[(t.cell_class == "Radial glia") & (t.metric == "G2M share of cycling cells")]
+            fixed = t[(t.cell_class == "Radial glia") & t.metric.str.startswith("G2M share of cycling cells (fixed")]
+            if len(raw):
+                bits.append("radial-glia G2/M share: raw rho "
+                            f"{raw.rho_v2.iloc[0]:+.2f}/{raw.rho_v3.iloc[0]:+.2f} ({raw.tier.iloc[0] or 'n.s.'})"
+                            + "".join(f"; {r.metric.split('(')[1].rstrip(')')} {r.rho_v2:+.2f}/{r.rho_v3:+.2f} "
+                                      f"({r.tier or 'n.s.'})" for r in fixed.itertuples()))
+            if not sub_diff.empty and (sub_diff.dataset == ds).any():
+                sd = sub_diff[sub_diff.dataset == ds]
+                bits.append("oRG vs vRG G2/M share at the same age: "
+                            + "; ".join(f"{r.chemistry} {r.mean_g2m_oRG:.2f} vs {r.mean_g2m_vRG:.2f}, oRG higher "
+                                        f"at {r.ages_oRG_higher}/{r.n_ages} ages (sign p = {C.fmt_p(r.sign_test_p)})"
+                                        for r in sd.itertuples()))
+            f.append(f"**{ds}: radial-glia sub-types (outer vs ventricular, script 19)** -- "
+                     + "; ".join(bits) + ". If the G2/M rise holds at a fixed sub-type mix it is a "
+                     "change within cells, not a shift towards oRG.")
+    elif not traj.empty:
+        f.append("**Radial-glia sub-types not available yet**: script 19 (stage 2) exports oRG vs vRG "
+                 "calls; re-run stage 2 to add them.")
     for ds in C.DATASETS:
         gm = gene_map[gene_map.dataset == ds]
         cnt = gm.proliferation_class.value_counts()

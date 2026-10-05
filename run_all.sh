@@ -35,6 +35,7 @@ ORDER=(
   16_expression_patterns       # Z-scored K-means expression patterns
   17_gsea_panels               # GSEA of the panels, reads 10's CSVs
   18_chemistry_comparability   # pooled by design: what survives stratification
+  19_rg_subtypes               # oRG vs vRG per radial-glia cell (streams X; after 09)
 )
 
 mkdir -p logs

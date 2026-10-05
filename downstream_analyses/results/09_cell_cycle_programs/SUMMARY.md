@@ -1,6 +1,6 @@
 # Cell-cycle programmes: proliferation over development and a phase map of genes
 
-_Generated 2026-10-05 07:26 UTC by `downstream_analyses/09_cell_cycle_programs.py` from `csv_exports/`._
+_Generated 2026-10-05 08:04 UTC by `downstream_analyses/09_cell_cycle_programs.py` from `csv_exports/`._
 
 ## Question
 
@@ -34,6 +34,7 @@ How does proliferation change over development within progenitor types; which ge
 - **cortex: proliferation over development in progenitors** -- fraction cycling falls with age in Radial glia (0.88->0.763 in v2, 0.746->0.6 in v3; replicated).
 - **human_dev: no replicated proliferation trend in progenitors.**
 - **G1 lengthening not testable yet**: phase fractions per cell class x age are exported by script 03 from this version on; re-run stage 1 to add them.
+- **Radial-glia sub-types not available yet**: script 19 (stage 2) exports oRG vs vRG calls; re-run stage 2 to add them.
 - **cortex gene phase map** (10,439 genes): 2323 proliferative (251 lean S, 397 lean G2/M), 2342 anti-proliferative, 2292 cycle-independent.
 - **human_dev gene phase map** (12,018 genes): 3129 proliferative, 2903 anti-proliferative, 2655 cycle-independent.
 - **Sanity check against the seed phase panels** (partly circular: phase calls come from such genes): cortex g2m_phase: lean -16.3/-18.2 null SDs (+ = S), 0 S / 47 G2/M genes; cortex s_phase: lean +12.1/+12.0 null SDs (+ = S), 33 S / 0 G2/M genes.
@@ -57,6 +58,7 @@ How does proliferation change over development within progenitor types; which ge
 
 - `proliferation_trajectories_per_stratum.csv` -- Per stratum x class: proliferation metric vs age (exact permutation p)
 - `proliferation_trajectories_combined.csv` -- v2 x v3 combined proliferation trends per class and metric; tier replicated / supported
+- `rg_subtype_g2m_difference.csv` -- oRG vs vRG: G2/M share of cycling cells compared age point by age point (sign test)
 - `gene_phase_map_per_stratum.csv` -- Per gene x stratum: Spearman with cluster proliferation; partial Spearman with the S share of S+G2M cells (cortex), controlling for proliferation
 - `gene_phase_map.csv` -- Per gene: proliferation class (|rho| >= 0.3 in both chemistries) and, for proliferative genes, S or G2/M lean (|partial rho| >= 0.2 in both; cortex)
 - `set_phase_profile_per_stratum.csv` -- Per gene set x stratum: mean proliferation association / S-vs-G2M lean vs matched null

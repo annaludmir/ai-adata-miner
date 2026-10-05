@@ -56,5 +56,6 @@ aim_run 15_sample_relationships
 aim_run 16_expression_patterns
 aim_run 17_gsea_panels
 aim_run 18_chemistry_comparability
+aim_run 19_rg_subtypes
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1
