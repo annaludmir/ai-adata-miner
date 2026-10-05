@@ -18,9 +18,10 @@ Questions
      does the radial-glia G2/M trend hold at a fixed sub-type mix (also with
      depth fixed, and threshold-free by oRG-score quintile)?
 
-Data: cortex carries a per-cell phase call (G1 / S / G2M / Post-M /
-Non-cycling); human_dev only a continuous cell-cycle score. So the S-vs-G2/M
-parts are cortex only, and human_dev contributes proliferation association.
+Data: both files carry a per-cell phase call (G1 / S / G2M / Post-M /
+Non-cycling; human_dev from its cell-cycle-annotated version). A dataset
+without phase calls falls back to the continuous cell-cycle score for
+proliferation, and its phase-share and S-vs-G2/M parts are skipped.
 The phase calls come from cell-cycle marker expression, so the canonical
 markers' own phase assignment is partly circular -- it serves as a sanity
 check, and the informative part is everything else.
@@ -34,8 +35,8 @@ Method
      because phase calls come from marker expression and UMIs per cell fall
      with age in cortex; a trend that vanishes there is a depth artefact.
   B. Cluster pseudobulks as in 07/08. Proliferation association = Spearman of
-     each gene's log2 TMM-CPM with the cluster's cycling fraction (cortex) or
-     mean cycle score (human_dev). Phase bias (cortex) = partial Spearman with
+     each gene's log2 TMM-CPM with the cluster's cycling fraction (mean cycle
+     score where there are no phase calls). Phase bias = partial Spearman with
      the cluster's S share of S+G2M cells, controlling for its cycling
      fraction, over clusters with >= 5% of cells in S or G2/M. Per set: mean
      association vs random sets matched on level x spread, v2/v3 combined.
@@ -316,12 +317,12 @@ def partial_spearman(X: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
     ry, rz = C.stats.rankdata(y), C.stats.rankdata(z)
     R = R - R.mean(axis=1, keepdims=True)
     ry, rz = ry - ry.mean(), rz - rz.mean()
-    zz = rz @ rz
-    Rres = R - np.outer(R @ rz / zz, rz)
-    yres = ry - (ry @ rz / zz) * rz
+    zz = float(C.dot(rz, rz))
+    Rres = R - np.outer(C.dot(R, rz) / zz, rz)
+    yres = ry - (float(C.dot(ry, rz)) / zz) * rz
     den = np.linalg.norm(Rres, axis=1) * np.linalg.norm(yres)
     with np.errstate(invalid="ignore", divide="ignore"):
-        return np.where(den > 0, Rres @ yres / den, np.nan)
+        return np.where(den > 0, C.dot(Rres, yres) / den, np.nan)
 
 
 def phase_map(out: C.Output) -> tuple[pd.DataFrame, dict]:
@@ -351,7 +352,7 @@ def phase_map(out: C.Output) -> tuple[pd.DataFrame, dict]:
     per = pd.concat(per, ignore_index=True)
     out.write(per, "gene_phase_map_per_stratum",
               "Per gene x stratum: Spearman with cluster proliferation; partial Spearman with the "
-              "S share of S+G2M cells (cortex), controlling for proliferation")
+              "S share of S+G2M cells (where phase calls exist), controlling for proliferation")
     # combine chemistries per dataset and classify
     rows = []
     for ds, g in per.groupby("dataset"):
@@ -373,11 +374,13 @@ def phase_map(out: C.Output) -> tuple[pd.DataFrame, dict]:
         else:
             w["phase_lean"] = ""
         w.insert(0, "dataset", ds)
+        w.insert(1, "proliferation_measure", "|".join(sorted(g.proliferation_measure.unique())))
         rows.append(w.reset_index())
     comb = pd.concat(rows, ignore_index=True)
     out.write(comb, "gene_phase_map",
               f"Per gene: proliferation class (|rho| >= {PROLIF_R} in both chemistries) and, for "
-              f"proliferative genes, S or G2/M lean (|partial rho| >= {PHASE_R} in both; cortex)")
+              f"proliferative genes, S or G2/M lean (|partial rho| >= {PHASE_R} in both; where phase "
+              "calls exist)")
     return comb, mats
 
 
@@ -535,6 +538,30 @@ def age_trends_without_proliferation(out: C.Output, gene_map: pd.DataFrame, list
 
 
 # ---------------------------------------------------------------------------
+def g1_finding(traj: pd.DataFrame) -> str | None:
+    """G1 share of cycling progenitors vs age: every variant, where any is significant."""
+    g1 = traj[traj.metric.str.startswith("G1 share") & traj.cell_class.isin(PROGENITORS)]
+    if g1.empty:
+        return None
+    parts = []
+    for (ds, cls), g in g1.groupby(["dataset", "cell_class"], sort=False):
+        if not (g.tier != "").any():
+            continue
+        variant = g.metric.str.extract(r"\((.*)\)")[0].fillna("raw")
+        parts.append(f"{ds} {cls} -- " + "; ".join(
+            f"{v}: {r.direction} ({r.range_v2} / {r.range_v3}, rho {r.rho_v2:+.2f}/{r.rho_v3:+.2f}, "
+            f"{r.tier or 'n.s.'})" for v, r in zip(variant, g.itertuples())))
+    raw = g1[g1.metric == "G1 share of cycling cells"]
+    return ("**G1 share of cycling progenitors over age** (rising = G1 lengthening; falling = G1 a "
+            "smaller part of the cycle; all variants shown where any is significant, so their "
+            "agreement is visible): "
+            + (" | ".join(parts) if parts else
+               "no trend in any variant -- raw "
+               + "; ".join(f"{r.dataset} {r.cell_class}: rho {r.rho_v2:+.2f} / {r.rho_v3:+.2f}"
+                           for r in raw.itertuples()))
+            + ".")
+
+
 def main() -> None:
     out = C.Output(SLUG)
     C.log(f"=== {SLUG}")
@@ -543,6 +570,10 @@ def main() -> None:
     _, traj = trajectories(out)
     sub_diff = subtype_g2m_difference(out)
     gene_map, mats = phase_map(out)
+    measure = gene_map.groupby("dataset").proliferation_measure.first().to_dict()
+    lean_ds = [ds for ds in C.DATASETS if "rho_s_vs_g2m_v2" in gene_map
+               and gene_map.loc[gene_map.dataset == ds, "rho_s_vs_g2m_v2"].notna().any()]
+    no_phase = [ds for ds in C.DATASETS if measure.get(ds) != "cycling"]
 
     # gene sets: user lists, seed NDD + cell-cycle panels, robust 08 modules
     lists = {ds: C.mapped_lists(ds) for ds in C.DATASETS} if C.gene_lists() else {}
@@ -564,7 +595,7 @@ def main() -> None:
     prof = set_phase_profile(out, gene_map, mats, sets_by_ds, rng)
     cind = age_trends_without_proliferation(out, gene_map, lists, rng) if lists else pd.DataFrame()
 
-    figures(out, traj, prof)
+    figures(out, traj, prof, lean_ds)
 
     # ---- findings -------------------------------------------------------------
     f = []
@@ -578,16 +609,9 @@ def main() -> None:
                      + "; ".join(f"{r.metric} {r.direction} with age in {r.cell_class} "
                                  f"({r.range_v2} in v2, {r.range_v3} in v3; {r.tier})"
                                  for r in t.itertuples()) + ".")
-        g1 = traj[traj.metric.str.startswith("G1 share") & traj.cell_class.isin(PROGENITORS)]
-        if len(g1):
-            rep = g1[g1.tier == "replicated"]
-            f.append("**G1 lengthening** (G1 share among cycling progenitors rising with age): "
-                     + ("; ".join(f"{r.dataset} {r.cell_class} {r.direction} ({r.range_v2} / {r.range_v3})"
-                                  for r in rep.itertuples()) if len(rep) else
-                        "not replicated in either chemistry pair -- "
-                        + "; ".join(f"{r.dataset} {r.cell_class}: rho {r.rho_v2:+.2f} / {r.rho_v3:+.2f}"
-                                    for r in g1.itertuples()))
-                     + ".")
+        g1 = g1_finding(traj)
+        if g1:
+            f.append(g1)
         dm = traj[traj.metric.str.contains("depth-matched") & traj.cell_class.isin(PROGENITORS)]
         if len(dm):
             raw = traj.set_index(["dataset", "cell_class", "metric"])
@@ -714,14 +738,19 @@ def main() -> None:
         "How does proliferation change over development within progenitor types; which genes "
         "and gene groups follow proliferation, and which lean to S or G2/M; and do list-level age "
         "trends in progenitors survive once proliferation-linked genes are set aside?",
-        ["A: per stratum x cell class, cycling fraction (cortex; cells not in Non-cycling or "
-         "Post-M), mean cell-cycle score, and G1/S/G2M shares among cycling cells (where 03 "
+        ["A: per stratum x cell class, cycling fraction (cells not in Non-cycling or Post-M, where "
+         "per-cell phase calls exist), mean cell-cycle score, and G1/S/G2M shares among cycling cells (where 03 "
          f"exports phase fractions per class x age), vs age over points with >= {MIN_POINT_CELLS} "
          "cells; Spearman, exact permutation p, v2/v3 signed Stouffer, BH per dataset, tiered.",
          "B: cluster pseudobulks as in 07/08 (log2 TMM-CPM). Proliferation association = "
-         "Spearman with the cluster's cycling fraction (cortex) or mean cycle score (human_dev). "
-         "S-vs-G2/M lean (cortex) = partial Spearman with S/(S+G2M) controlling for cycling "
-         f"fraction, over clusters with >= {MIN_CYCLING_SHARE:.0%} of cells in S or G2/M. Gene "
+         "Spearman with the cluster's "
+         + "; ".join(f"{'cycling fraction' if m == 'cycling' else 'mean cycle score'} ({ds})"
+                     for ds, m in measure.items()) + ". "
+         + (f"S-vs-G2/M lean ({', '.join(lean_ds)}) = partial Spearman with S/(S+G2M) controlling "
+            "for cycling fraction, over clusters with "
+            f">= {MIN_CYCLING_SHARE:.0%} of cells in S or G2/M. " if lean_ds else
+            "No dataset has the per-cluster phase fractions needed for an S-vs-G2/M lean. ")
+         + "Gene "
          f"classes need |rho| >= {PROLIF_R} (lean: >= {PHASE_R}) in both chemistries; "
          f"cycle-independent = |rho| < {INDEPENDENT_R} in both.",
          f"Set profiles: mean association of a set's genes vs {N_RANDOM:,} random sets matched "
@@ -735,7 +764,11 @@ def main() -> None:
          "expression.",
          "Phase calls are derived from cell-cycle marker genes; canonical markers' phase lean is "
          "partly circular and serves only as a check.",
-         "human_dev has no per-cell phase calls, so it has no G1/S/G2M shares or phase lean.",
+         *([f"{', '.join(no_phase)} {'has' if len(no_phase) == 1 else 'have'} no per-cell phase "
+            "calls, so no G1/S/G2M shares or phase lean there."] if no_phase else []),
+         "A phase share among cycling cells reflects that phase's share of cycle time only for an "
+         "asynchronous population at steady state, and the G1 / Non-cycling boundary of marker-based "
+         "calls is soft: read G1 shares as relative, not as durations.",
          "Age points are donors (5-9 per chemistry); trends are across that many people."],
         ["Export per-cell-phase pseudobulks (cell class x phase) in stage 2 for a direct, "
          "non-ecological phase profile of every gene.",
@@ -743,7 +776,7 @@ def main() -> None:
          "model) per progenitor type and age."])
 
 
-def figures(out: C.Output, traj: pd.DataFrame, prof: pd.DataFrame) -> None:
+def figures(out: C.Output, traj: pd.DataFrame, prof: pd.DataFrame, lean_ds: list[str]) -> None:
     plt = C.plt_or_none()
     if plt is None:
         return
@@ -776,9 +809,13 @@ def figures(out: C.Output, traj: pd.DataFrame, prof: pd.DataFrame) -> None:
         plt.close(fig)
     if prof.empty or "rho_s_vs_g2m_v2" not in prof:
         return
-    p = prof[(prof.dataset == "cortex")].dropna(subset=["rho_proliferation_v2", "rho_s_vs_g2m_v2"])
-    if p.empty:
-        return
+    for ds in lean_ds:
+        p = prof[prof.dataset == ds].dropna(subset=["rho_proliferation_v2", "rho_s_vs_g2m_v2"])
+        if not p.empty:
+            phase_profile_figure(out, plt, p, ds)
+
+
+def phase_profile_figure(out: C.Output, plt, p: pd.DataFrame, ds: str) -> None:
     fig, ax = plt.subplots(figsize=(6.4, 5))
     for r in p.itertuples():
         kind = r.gene_set.split(":")[0]
@@ -793,10 +830,10 @@ def figures(out: C.Output, traj: pd.DataFrame, prof: pd.DataFrame) -> None:
     ax.axvline(0, color="grey", lw=0.6)
     ax.set_xlabel("mean association with proliferation (Spearman, mean of v2/v3)", fontsize=8)
     ax.set_ylabel("mean S (+) vs G2/M (-) lean (partial Spearman)", fontsize=8)
-    ax.set_title("cortex: phase profile of gene sets (orange lists, blue seed panels, grey modules)",
+    ax.set_title(f"{ds}: phase profile of gene sets (orange lists, blue seed panels, grey modules)",
                  fontsize=8)
     fig.tight_layout()
-    out.figure(fig, "phase_profile_cortex", "Gene-set proliferation association vs S/G2M lean, cortex")
+    out.figure(fig, f"phase_profile_{ds}", f"Gene-set proliferation association vs S/G2M lean, {ds}")
     plt.close(fig)
 
 

@@ -83,8 +83,8 @@ def coherence_test(Zn: np.ndarray, bins: np.ndarray, idx: np.ndarray,
     rand = C.matched_sets(bins, idx, N_RANDOM, rng)
     sums = C.set_sums(Zn, rand)
     null = C.coherence_from_sums(sums, k)
-    conn = (Zn[idx] @ S - 1.0) / (k - 1)
-    conn_null = (Zn[idx] @ sums.T) / k                       # gene vs random set
+    conn = (C.dot(Zn[idx], S) - 1.0) / (k - 1)
+    conn_null = C.dot(Zn[idx], sums.T) / k                   # gene vs random set
     p_gene = ((conn_null >= conn[:, None]).sum(axis=1) + 1) / (N_RANDOM + 1)
     return coh, null, conn, p_gene
 
@@ -109,7 +109,7 @@ def silhouette_precomputed(D: np.ndarray, labels: np.ndarray) -> float:
     onehot = np.zeros((len(labels), len(uniq)))
     onehot[np.arange(len(labels)), inv] = 1.0
     counts = onehot.sum(axis=0)
-    sums = D @ onehot
+    sums = C.dot(D, onehot)
     own_n = counts[inv]
     a = np.divide(sums[np.arange(len(labels)), inv], own_n - 1,
                   out=np.zeros(len(labels)), where=own_n > 1)
@@ -172,7 +172,7 @@ def submodule_null(ds: str, disc: str, held: str, shared: pd.Index, idx_shared: 
     out = []
     for r in rand:
         Zr = Zd[rows_d[r]]
-        lab = split_submodules(Zr @ Zr.T)[0]
+        lab = split_submodules(C.dot(Zr, Zr.T))[0]
         if len(set(lab) - {0}) < 2:
             continue                       # no split: nothing comparable to record
         for lv in set(lab) - {0}:
@@ -308,7 +308,7 @@ def main() -> None:
             for c in C.CHEMISTRIES:
                 Zn = data[(ds, c)][2]["across_clusters"][0]
                 ix = np.array([pos[c][g] for g in members])
-                R[c] = Zn[ix] @ Zn[ix].T
+                R[c] = C.dot(Zn[ix], Zn[ix].T)
             Cc = np.tanh((np.arctanh(np.clip(R["v2"], -0.999, 0.999))
                           + np.arctanh(np.clip(R["v3"], -0.999, 0.999))) / 2)
             np.fill_diagonal(Cc, 1.0)
@@ -376,7 +376,7 @@ def main() -> None:
                     rs = {}
                     for chem, (e, Zn, idxs) in eig.items():
                         ez = C.unit_rank_rows(e[None, :])[0]
-                        rs[chem] = pd.Series(Zn @ ez, index=idxs)
+                        rs[chem] = pd.Series(C.dot(Zn, ez), index=idxs)
                     both = rs["v2"].index.intersection(rs["v3"].index)
                     cand = pd.DataFrame({"r_v2": rs["v2"].loc[both], "r_v3": rs["v3"].loc[both]})
                     cand = cand[~cand.index.isin(mem)]

@@ -15,6 +15,18 @@ Needs numpy, pandas and scipy. matplotlib is optional; without it the figures
 are skipped. To read exports from somewhere else, set `AI_ADATA_OUT_ROOT`, and
 to write results elsewhere, set `AIM_DOWNSTREAM_OUT`.
 
+Every analysis first checks that numpy computes correctly, and stops with
+instructions if it does not. numpy 2.2.6 on macOS 26 (the Mac's system Python)
+returned rank correlations above 1 on large arrays; numpy 2.5 and the cluster's
+numpy are fine. Correlation helpers also spot-check a few values against a
+pure-Python recomputation on every call. If the check stops a run, use a fresh
+environment:
+
+```bash
+python3 -m venv ~/aim-env && ~/aim-env/bin/pip install -U numpy scipy pandas matplotlib
+PYTHON=~/aim-env/bin/python ./downstream_analyses/run_all.sh
+```
+
 ## The analyses
 
 | # | Question | Replicate unit | Main output |

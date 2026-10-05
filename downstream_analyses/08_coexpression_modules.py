@@ -194,7 +194,7 @@ def main() -> None:
                 rk.append(V.var(axis=1).loc[shared].rank(ascending=False))
             universe = pd.concat(rk, axis=1).mean(axis=1).sort_values().index[:N_VARIABLE].to_numpy()
             rows = {c: np.array([pos[c][g] for g in universe]) for c in C.CHEMISTRIES}
-            R = {c: ctx[c][0][rows[c]] @ ctx[c][0][rows[c]].T for c in C.CHEMISTRIES}
+            R = {c: C.dot(ctx[c][0][rows[c]], ctx[c][0][rows[c]].T) for c in C.CHEMISTRIES}
             Cm = consensus(R["v2"], R["v3"])
             # Correlation strength differs by dataset and context (within-class
             # residuals correlate far less), so the cut follows the data: the
@@ -247,7 +247,7 @@ def main() -> None:
                     e = Zz[idx].mean(axis=0)
                     scores[(name, c)] = pd.Series(e, index=cols)
                     ez = C.unit_rank_rows(e[None, :])[0]
-                    kme[c] = pd.Series(Zn[idx] @ ez, index=genes)
+                    kme[c] = pd.Series(C.dot(Zn[idx], ez), index=genes)
                     a = data[(ds, c)][1].loc[cols]
                     # Where the genes are expressed comes from their raw profiles: in the
                     # within-class context every class mean is zero by construction.

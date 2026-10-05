@@ -400,10 +400,21 @@ def main() -> None:
                           if len(mods) else ""))
     if not genes_b.empty and "dynamics" in genes_b:
         cnt = genes_b[genes_b.dynamics != ""].groupby(["cell_class", "dynamics"]).size().unstack(fill_value=0)
-        f.append("**Genes by dynamics within classes** (unspliced-share trend and expression trend "
-                 "both replicated, or expression flat): "
-                 + "; ".join(f"{cls}: " + ", ".join(f"{int(v)} {k}" for k, v in row.items() if v)
-                             for cls, row in cnt.iterrows()) + ".")
+        n_rep = int((genes_b.tier == "replicated").sum())
+        if cnt.empty and n_rep == 0:
+            f.append(f"**No single gene's unspliced-share age trend replicates** (0 of "
+                     f"{len(genes_b):,} gene x class tests pass in both chemistries at q < 0.05): with "
+                     "5-7 age points per chemistry, single genes are underpowered; the gene-set tests "
+                     "below pool genes and carry the signal.")
+        elif cnt.empty:
+            f.append(f"**Genes by dynamics within classes**: {n_rep} gene x class unspliced-share "
+                     "trends replicate, but none pairs with a replicated or flat expression trend, so "
+                     "none is classed (see `unspliced_age_trends.csv`).")
+        else:
+            f.append("**Genes by dynamics within classes** (unspliced-share trend and expression "
+                     "trend both replicated, or expression flat): "
+                     + "; ".join(f"{cls}: " + ", ".join(f"{int(v)} {k}" for k, v in row.items() if v)
+                                 for cls, row in cnt.iterrows()) + ".")
     if not set_b.empty:
         rep = set_b[(set_b.tier == "replicated") & set_b.gene_set.str.startswith(("list:", "seed:"))]
         f.append("**Gene sets whose unspliced share changes with age inside a class** (replicated) -- "

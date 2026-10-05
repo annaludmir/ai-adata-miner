@@ -68,8 +68,8 @@ def main() -> None:
         # variable genes: largest identity contrast on either side
         spread = pd.concat([pa.abs().max(axis=1), pb.abs().max(axis=1)], axis=1).min(axis=1)
         top = spread.sort_values(ascending=False).head(TOP_VARIABLE).index
-        cm = pd.DataFrame(np.corrcoef(pa.loc[top].T.to_numpy(), pb.loc[top].T.to_numpy())
-                          [:len(classes), len(classes):], index=classes, columns=classes)
+        cm = pd.DataFrame(C.corr_rows(pa.loc[top].T.to_numpy(), pb.loc[top].T.to_numpy()),
+                          index=classes, columns=classes)
         label = f"{na} vs {nb}"
         mats[label] = cm
         ma = C.csv(na, "10_markers/top_markers_cell_class.csv")

@@ -1,6 +1,6 @@
 # Cell-cycle programmes: proliferation over development and a phase map of genes
 
-_Generated 2026-10-05 10:57 UTC by `downstream_analyses/09_cell_cycle_programs.py` from `csv_exports/`._
+_Generated 2026-10-05 21:56 UTC by `downstream_analyses/09_cell_cycle_programs.py` from `csv_exports/`._
 
 ## Question
 
@@ -24,8 +24,8 @@ How does proliferation change over development within progenitor types; which ge
 
 ## Method
 
-- A: per stratum x cell class, cycling fraction (cortex; cells not in Non-cycling or Post-M), mean cell-cycle score, and G1/S/G2M shares among cycling cells (where 03 exports phase fractions per class x age), vs age over points with >= 50 cells; Spearman, exact permutation p, v2/v3 signed Stouffer, BH per dataset, tiered.
-- B: cluster pseudobulks as in 07/08 (log2 TMM-CPM). Proliferation association = Spearman with the cluster's cycling fraction (cortex) or mean cycle score (human_dev). S-vs-G2/M lean (cortex) = partial Spearman with S/(S+G2M) controlling for cycling fraction, over clusters with >= 5% of cells in S or G2/M. Gene classes need |rho| >= 0.3 (lean: >= 0.2) in both chemistries; cycle-independent = |rho| < 0.2 in both.
+- A: per stratum x cell class, cycling fraction (cells not in Non-cycling or Post-M, where per-cell phase calls exist), mean cell-cycle score, and G1/S/G2M shares among cycling cells (where 03 exports phase fractions per class x age), vs age over points with >= 50 cells; Spearman, exact permutation p, v2/v3 signed Stouffer, BH per dataset, tiered.
+- B: cluster pseudobulks as in 07/08 (log2 TMM-CPM). Proliferation association = Spearman with the cluster's cycling fraction (cortex); mean cycle score (human_dev). S-vs-G2/M lean (cortex) = partial Spearman with S/(S+G2M) controlling for cycling fraction, over clusters with >= 5% of cells in S or G2/M. Gene classes need |rho| >= 0.3 (lean: >= 0.2) in both chemistries; cycle-independent = |rho| < 0.2 in both.
 - Set profiles: mean association of a set's genes vs 2,000 random sets matched member by member on mean level x spread; v2/v3 combined, BH per dataset, tiered.
 - C: 06's list age-coordination test in Radial glia, Neuronal IPC and Glioblast, restricted to cycle-independent genes, null drawn from cycle-independent genes of matched expression level.
 
@@ -46,7 +46,8 @@ How does proliferation change over development within progenitor types; which ge
 
 - Cluster pseudobulks pool cells of all phases, so gene-phase associations are between clusters with different phase mixes -- an ecological measure, not per-cell phase expression.
 - Phase calls are derived from cell-cycle marker genes; canonical markers' phase lean is partly circular and serves only as a check.
-- human_dev has no per-cell phase calls, so it has no G1/S/G2M shares or phase lean.
+- human_dev has no per-cell phase calls, so no G1/S/G2M shares or phase lean there.
+- A phase share among cycling cells reflects that phase's share of cycle time only for an asynchronous population at steady state, and the G1 / Non-cycling boundary of marker-based calls is soft: read G1 shares as relative, not as durations.
 - Age points are donors (5-9 per chemistry); trends are across that many people.
 
 ## What would strengthen this
@@ -59,8 +60,8 @@ How does proliferation change over development within progenitor types; which ge
 - `proliferation_trajectories_per_stratum.csv` -- Per stratum x class: proliferation metric vs age (exact permutation p)
 - `proliferation_trajectories_combined.csv` -- v2 x v3 combined proliferation trends per class and metric; tier replicated / supported
 - `rg_subtype_g2m_difference.csv` -- oRG vs vRG: G2/M share of cycling cells compared age point by age point (sign test)
-- `gene_phase_map_per_stratum.csv` -- Per gene x stratum: Spearman with cluster proliferation; partial Spearman with the S share of S+G2M cells (cortex), controlling for proliferation
-- `gene_phase_map.csv` -- Per gene: proliferation class (|rho| >= 0.3 in both chemistries) and, for proliferative genes, S or G2/M lean (|partial rho| >= 0.2 in both; cortex)
+- `gene_phase_map_per_stratum.csv` -- Per gene x stratum: Spearman with cluster proliferation; partial Spearman with the S share of S+G2M cells (where phase calls exist), controlling for proliferation
+- `gene_phase_map.csv` -- Per gene: proliferation class (|rho| >= 0.3 in both chemistries) and, for proliferative genes, S or G2/M lean (|partial rho| >= 0.2 in both; where phase calls exist)
 - `set_phase_profile_per_stratum.csv` -- Per gene set x stratum: mean proliferation association / S-vs-G2M lean vs matched null
 - `set_phase_profile.csv` -- Per gene set: proliferation association and S-vs-G2/M lean (v2/v3 combined, tiered), with counts of proliferative, S-, G2/M-leaning, anti-proliferative genes
 - `proliferation_cortex.png` -- Progenitor proliferation vs age, cortex

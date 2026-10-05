@@ -89,6 +89,7 @@ class Output:
     """Result folder for one analysis: CSVs, figures and the SUMMARY.md."""
 
     def __init__(self, slug: str):
+        check_numerics()
         self.slug = slug
         self.dir = RESULTS / slug
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -321,19 +322,140 @@ def bh(p) -> np.ndarray:
     return q
 
 
+# ---------------------------------------------------------------------------
+# numerical gate: refuse to run on a numpy build that computes wrongly
+# ---------------------------------------------------------------------------
+# numpy 2.2.6 on macOS 26.2 (the Mac's system Python) silently computed wrong
+# rank correlations on large arrays -- 8,000 x 6 matrices gave Spearman rho
+# above 1 -- with the error moving between operations (ranking, centring,
+# products) depending on how arrays sat in memory, so checking any single
+# operation was not enough. numpy 2.5.3 on the same machine and the cluster's
+# Linux numpy were correct. Every analysis therefore starts by running the
+# real correlation routine on large inputs with known answers and stops with
+# instructions if anything is off.
+_NUMERICS_OK = False
+
+
+def _numerics_fail(what: str) -> None:
+    sys.exit("ERROR: numpy " + np.__version__ + " on this machine computes wrong results (" + what
+             + "). Seen with numpy 2.2.6 on macOS 26; every statistic would be silently wrong. "
+             "Use a newer numpy in a separate environment, e.g.\n"
+             "  python3 -m venv ~/aim-env && ~/aim-env/bin/pip install -U numpy scipy pandas matplotlib\n"
+             "  PYTHON=~/aim-env/bin/python ./downstream_analyses/run_all.sh\n"
+             "or run step 3 on the cluster (slurm_04_downstream.sh).")
+
+
+def check_numerics() -> None:
+    """End-to-end check of the correlation machinery on large inputs with known answers."""
+    global _NUMERICS_OK
+    if _NUMERICS_OK:
+        return
+    ages = np.array([7.5, 8.0, 8.5, 9.2, 9.5, 10.0])
+    base = np.array([[-2.899, -3.711, -3.135, -2.303, -3.062, -3.332],
+                     [5.786, 4.733, 4.854, 5.623, 5.572, 5.673]])
+    known = np.array([stats.spearmanr(r, ages).statistic for r in base])
+    try:
+        for reps in (2000, 4000, 8000, 16000):
+            rho = spearman_rows(np.vstack([base] * reps), ages)
+            if not np.allclose(rho, np.tile(known, reps)):
+                raise ValueError(f"rank correlation on {2 * reps} x 6 rows")
+        rng = np.random.default_rng(7)
+        X = rng.normal(size=(20000, 7)).round(3)
+        x = np.arange(7.0)
+        rho = spearman_rows(X, x)
+        for i in rng.choice(len(X), size=200, replace=False):
+            if not np.isclose(rho[i], stats.spearmanr(X[i], x).statistic):
+                raise ValueError("rank correlation on 20,000 x 7 random rows")
+        A, B = rng.normal(size=(3000, 400)), rng.normal(size=(400, 300))
+        P = A @ B
+        for _ in range(100):
+            i, j = int(rng.integers(3000)), int(rng.integers(300))
+            if not np.isclose(P[i, j], math.fsum(float(u) * float(v) for u, v in zip(A[i], B[:, j]))):
+                raise ValueError("matrix product 3000 x 400 x 300")
+    except ValueError as err:
+        _numerics_fail(str(err))
+    _NUMERICS_OK = True
+
+
+def dot(a, b) -> np.ndarray:
+    """a @ b for dense arrays (the single place products go)."""
+    return np.asarray(a, dtype=float) @ np.asarray(b, dtype=float)
+
+
+# Second line of defence, on every call: a correlation outside [-1, 1], or a
+# few sampled entries that disagree with a pure-Python recomputation, stop the
+# run. Cheap (a handful of short loops per call) and independent of numpy.
+_SPOT_CHECKS = 6
+_spot_rng = np.random.default_rng(SEED)
+
+
+def _pearson_py(a, b) -> float:
+    a, b = [float(u) for u in a], [float(u) for u in b]
+    ma, mb = math.fsum(a) / len(a), math.fsum(b) / len(b)
+    da, db = [u - ma for u in a], [u - mb for u in b]
+    den = math.sqrt(math.fsum(u * u for u in da) * math.fsum(u * u for u in db))
+    return math.fsum(u * w for u, w in zip(da, db)) / den if den > 0 else 0.0
+
+
+def _rank_py(v) -> list[float]:
+    """Average ranks (ties share the mean rank), as scipy.stats.rankdata."""
+    v = [float(u) for u in v]
+    order = sorted(range(len(v)), key=v.__getitem__)
+    ranks = [0.0] * len(v)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and v[order[j + 1]] == v[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return ranks
+
+
+def _spot_check(values: np.ndarray, reference, what: str) -> None:
+    """values: correlations just computed; reference(index) recomputes one in pure Python."""
+    if np.nanmax(np.abs(values), initial=0.0) > 1 + 1e-9:
+        _numerics_fail(f"a {what} above 1 in absolute value")
+    ok = np.flatnonzero(np.isfinite(values.ravel()))
+    for flat in _spot_rng.choice(ok, size=min(_SPOT_CHECKS, ok.size), replace=False):
+        idx = np.unravel_index(flat, values.shape)
+        if not math.isclose(values[idx], reference(idx), rel_tol=1e-7, abs_tol=1e-9):
+            _numerics_fail(f"{what} at {tuple(int(i) for i in idx)} of {values.shape}")
+
+
+def corr_rows(A: np.ndarray, B: np.ndarray | None = None) -> np.ndarray:
+    """Pearson correlation between the rows of A (and of B), via dot()."""
+    def z(M):
+        M = np.asarray(M, dtype=float)
+        M = M - M.mean(axis=1, keepdims=True)
+        n = np.linalg.norm(M, axis=1, keepdims=True)
+        return np.divide(M, n, out=np.zeros_like(M), where=n > 0)
+    A0 = np.asarray(A, dtype=float)
+    B0 = A0 if B is None else np.asarray(B, dtype=float)
+    A = z(A0)
+    B = A if B is None else z(B0)
+    out = dot(A, B.T)
+    _spot_check(out, lambda ij: _pearson_py(A0[ij[0]], B0[ij[1]]), "Pearson correlation")
+    return out
+
+
 def rank_rows(X: np.ndarray) -> np.ndarray:
     return np.apply_along_axis(stats.rankdata, 1, X)
 
 
 def spearman_rows(X: np.ndarray, x: np.ndarray) -> np.ndarray:
     """Spearman rho of every row of X against the vector x (ties averaged)."""
-    R = rank_rows(np.asarray(X, dtype=float))
+    X = np.asarray(X, dtype=float)
+    R = rank_rows(X)
     rx = stats.rankdata(x)
     R = R - R.mean(axis=1, keepdims=True)
     rx = rx - rx.mean()
     den = np.sqrt((R ** 2).sum(axis=1) * (rx ** 2).sum())
     with np.errstate(invalid="ignore", divide="ignore"):
-        return np.where(den > 0, R @ rx / den, np.nan)
+        rho = np.where(den > 0, dot(R, rx) / den, np.nan)
+    _spot_check(rho, lambda i: _pearson_py(_rank_py(X[i[0]]), _rank_py(x)), "rank correlation")
+    return rho
 
 
 def permutation_orders(n: int, n_perm: int = 200_000, seed: int = SEED) -> np.ndarray:
@@ -364,7 +486,7 @@ def spearman_perm_p(rho: np.ndarray, x: np.ndarray, X: np.ndarray | None = None,
         base = np.arange(1, len(x) + 1, dtype=float)
         base -= base.mean()
         rxp = rx[orders] - rx.mean()
-        null = rxp @ base / np.sqrt((base ** 2).sum() * (rxp ** 2).sum(axis=1))
+        null = dot(rxp, base) / np.sqrt((base ** 2).sum() * (rxp ** 2).sum(axis=1))
         null = np.sort(np.abs(null))
         # count |null| >= |rho| with a small tolerance for float ties
         k = null.size - np.searchsorted(null, np.abs(rho) - 1e-12, side="left")
@@ -376,7 +498,7 @@ def spearman_perm_p(rho: np.ndarray, x: np.ndarray, X: np.ndarray | None = None,
     rxp = rx[orders] - rx.mean()
     den = np.sqrt((R ** 2).sum(axis=1)[:, None] * (rxp ** 2).sum(axis=1)[None, :])
     with np.errstate(invalid="ignore", divide="ignore"):
-        null = np.abs(np.where(den > 0, R @ rxp.T / den, 0.0))
+        null = np.abs(np.where(den > 0, dot(R, rxp.T) / den, 0.0))
     k = (null >= np.abs(rho)[:, None] - 1e-12).sum(axis=1)
     p = (k + (0 if exact else 1)) / (orders.shape[0] + (0 if exact else 1))
     return np.where(np.isfinite(rho), p, np.nan), exact

@@ -67,7 +67,7 @@ def test_stratum(n: str, ds: str, chem: str, chrom, panel_of) -> pd.DataFrame:
         rho = C.spearman_rows(X, ages)
         p, exact = C.spearman_perm_p(rho, ages, n_perm=N_PERM)
         xc = ages - ages.mean()
-        slope = (X - X.mean(axis=1, keepdims=True)) @ xc / (xc ** 2).sum()
+        slope = C.dot(X - X.mean(axis=1, keepdims=True), xc) / (xc ** 2).sum()
         C.log(f"  {n} {cls}: {len(genes):,} expressed genes x {len(ages)} ages "
               f"({ages.min():g}-{ages.max():g} pcw), {'exact' if exact else 'Monte Carlo'} null")
         rows.append(pd.DataFrame({
