@@ -24,7 +24,10 @@ Method
   A. Per stratum x cell class, the per-age value (cycling fraction, mean cycle
      score, and G1/S/G2M shares among cycling cells where phase fractions per
      class x age exist) vs age: Spearman, exact permutation, v2/v3 signed
-     Stouffer, tiered as elsewhere.
+     Stouffer, tiered as elsewhere. The phase shares are also computed at
+     matched depth -- within UMI quintiles, then averaged with fixed weights --
+     because phase calls come from marker expression and UMIs per cell fall
+     with age in cortex; a trend that vanishes there is a depth artefact.
   B. Cluster pseudobulks as in 07/08. Proliferation association = Spearman of
      each gene's log2 TMM-CPM with the cluster's cycling fraction (cortex) or
      mean cycle score (human_dev). Phase bias (cortex) = partial Spearman with
@@ -61,6 +64,8 @@ TITLE = "Cell-cycle programmes: proliferation over development and a phase map o
 MIN_AGES = 5
 MIN_POINT_CELLS = 50
 MIN_CYCLING_CELLS = 20       # cycling cells needed at an age point to compute phase shares
+MIN_BIN_CYCLING = 5          # ... and per depth quintile for depth-matched shares
+MIN_DEPTH_WEIGHT = 0.6       # depth quintiles present must carry >= this share of the weight
 MIN_CYCLING_SHARE = 0.05     # clusters with >= this fraction of cells in S or G2/M
 PROLIF_R = 0.3               # |rho| for a gene to count as proliferation-linked
 PHASE_R = 0.2                # |partial rho| for an S or G2/M lean
@@ -74,6 +79,47 @@ MAX_LISTED = 8
 # ---------------------------------------------------------------------------
 # A. proliferation over development
 # ---------------------------------------------------------------------------
+def depth_standardised_shares(dp: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """G1/S/G2M shares of cycling cells per class x age, compared at matched depth.
+
+    Phase calls come from marker expression and can drift with UMIs per cell,
+    which falls with age in cortex. Within each UMI quintile (quintiles are
+    per cell class, over all ages) the shares are computed separately, then
+    averaged with fixed weights -- each quintile's share of the class's cycling
+    cells over all ages -- so every age point is read at the same depth mix.
+    An age point needs quintiles covering >= MIN_DEPTH_WEIGHT of that weight,
+    each with >= MIN_BIN_CYCLING cycling cells. Also returns median UMIs per
+    cell per class x age, to show the depth drift itself.
+    """
+    if not {"G1", "S", "G2M"} <= set(dp.columns):
+        return {}
+    dp = dp.copy()
+    for ph in ("G1", "S", "G2M"):
+        dp[f"n_{ph}"] = dp[ph].fillna(0) * dp.n_cells
+    dp["n_cyc"] = dp[["n_G1", "n_S", "n_G2M"]].sum(axis=1)
+    out = {f"{ph} share of cycling cells (depth-matched)": [] for ph in ("G1", "S", "G2M")}
+    out["median UMIs per cell"] = []
+    for cls, g in dp.groupby("cell_class"):
+        w = g.groupby("depth_bin")["n_cyc"].sum()
+        if w.sum() <= 0:
+            continue
+        w = w / w.sum()
+        for age, h in g.groupby("age"):
+            out["median UMIs per cell"].append(
+                {"cell_class": cls, "age_pcw": age,
+                 "value": float(np.average(h.median_umis, weights=h.n_cells))})
+            h = h[h.n_cyc >= MIN_BIN_CYCLING].set_index("depth_bin")
+            cover = w.reindex(h.index).fillna(0)
+            if cover.sum() < MIN_DEPTH_WEIGHT:
+                continue
+            for ph in ("G1", "S", "G2M"):
+                share = h[f"n_{ph}"] / h["n_cyc"]
+                out[f"{ph} share of cycling cells (depth-matched)"].append(
+                    {"cell_class": cls, "age_pcw": age,
+                     "value": float((share * cover).sum() / cover.sum())})
+    return {k: pd.DataFrame(v, columns=["cell_class", "age_pcw", "value"]) for k, v in out.items() if v}
+
+
 def trajectories(out: C.Output) -> tuple[pd.DataFrame, pd.DataFrame]:
     rows = []
     for ds, chem in C.STRATA:
@@ -98,6 +144,10 @@ def trajectories(out: C.Output) -> tuple[pd.DataFrame, pd.DataFrame]:
                     d = pf.loc[ok, ["cell_class", "age"]].rename(columns={"age": "age_pcw"})
                     d["value"] = (pf.loc[ok, ph] / cyc[ok]).to_numpy()
                     metrics[f"{ph} share of cycling cells"] = d
+        dp_path = C.EXPORTS / n / "03_cellcycle" / "phase_fractions_by_cell_class_x_age_x_depth.csv"
+        if dp_path.exists():
+            out.used(f"{n}/03_cellcycle/phase_fractions_by_cell_class_x_age_x_depth.csv")
+            metrics.update(depth_standardised_shares(pd.read_csv(dp_path)))
         for label, d in metrics.items():
             for cls, g in d.dropna().groupby("cell_class"):
                 g = g.sort_values("age_pcw")
@@ -443,7 +493,26 @@ def main() -> None:
                         + "; ".join(f"{r.dataset} {r.cell_class}: rho {r.rho_v2:+.2f} / {r.rho_v3:+.2f}"
                                     for r in g1.itertuples()))
                      + ".")
-        elif not any(m.startswith("G1 share") for m in traj.metric.unique()):
+        dm = traj[traj.metric.str.contains("depth-matched") & traj.cell_class.isin(PROGENITORS)]
+        if len(dm):
+            raw = traj.set_index(["dataset", "cell_class", "metric"])
+            parts = []
+            for r in dm.itertuples():
+                base = r.metric.replace(" (depth-matched)", "")
+                rr = raw.loc[(r.dataset, r.cell_class, base)] if (r.dataset, r.cell_class, base) in raw.index else None
+                if rr is None or (rr.tier == "" and r.tier == ""):
+                    continue
+                parts.append(f"{r.dataset} {r.cell_class} {base.split(' share')[0]} share: raw rho "
+                             f"{rr.rho_v2:+.2f}/{rr.rho_v3:+.2f} ({rr.tier or 'n.s.'}), depth-matched "
+                             f"{r.rho_v2:+.2f}/{r.rho_v3:+.2f} ({r.tier or 'n.s.'})")
+            umi = traj[(traj.metric == "median UMIs per cell") & traj.cell_class.isin(PROGENITORS)]
+            f.append("**Depth check on phase shares** (cells compared within UMI quintiles; "
+                     "trends that vanish there are likely depth artefacts of the phase calls): "
+                     + ("; ".join(parts) if parts else "no phase-share trend to check")
+                     + ". UMIs per cell vs age: "
+                     + ", ".join(f"{r.dataset} {r.cell_class} rho {r.rho_v2:+.2f}/{r.rho_v3:+.2f}"
+                                 for r in umi.itertuples()) + ".")
+        if not any(m.startswith("G1 share") for m in traj.metric.unique()):
             f.append("**G1 lengthening not testable yet**: phase fractions per cell class x age are "
                      "exported by script 03 from this version on; re-run stage 1 to add them.")
     for ds in C.DATASETS:

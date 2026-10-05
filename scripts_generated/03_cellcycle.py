@@ -11,6 +11,7 @@ Outputs (csv_exports/<dataset>/03_cellcycle/)
   cycle_scores_by_<grouping>.csv      continuous score stats per group
   proliferation_trajectory.csv        cell class x week: cycling fraction + scores
   phase_fractions_by_cell_class_x_{age,donor}.csv  phase composition per class x week / donor
+  phase_fractions_by_cell_class_x_age_x_depth.csv  the same per class x week x UMI quintile
   cycling_summary.csv                 one row per cell class, overall
 """
 from __future__ import annotations
@@ -31,6 +32,7 @@ from lib.io_utils import (Manifest, load_obs, log,
 
 SCRIPT = "03_cellcycle"
 SUBDIR = "03_cellcycle"
+DEPTH_BINS = 5      # UMI quintiles within each cell class
 CYCLE_SCORE_COLS = ["cell_cycle_score", "cycling_score", "cc_g1", "cc_s", "cc_g2m"]
 MAX_GROUP_LEVELS = 1000
 
@@ -139,6 +141,28 @@ def run(key: str, args, chem: str | None = None,
                 fr["below_min_cells"] = fr["n_cells"] < config.MIN_CELLS_PER_GROUP
                 man.write(fr, f"phase_fractions_by_cell_class_x_{label}",
                           f"Cell-cycle phase composition per cell class x {label}", subdir=SUBDIR)
+
+            # The same per class x week, within depth bins. Phase calls come from
+            # marker expression, so they can shift with UMIs per cell -- which
+            # falls with age in cortex. Bins are UMI quintiles within each cell
+            # class (all ages of this stratum), so a downstream analysis can
+            # compare ages at matched depth.
+            if "total_umis" in work.columns and work["total_umis"].notna().any():
+                d = work[[class_col, "age_pcw", phase_col, "total_umis"]].dropna()
+                d = d.assign(depth_bin=d.groupby(class_col, observed=True)["total_umis"].transform(
+                    lambda x: pd.qcut(x.rank(method="first"), DEPTH_BINS, labels=False)
+                    if len(x) >= DEPTH_BINS else 0))
+                ct = (d.groupby([class_col, "age_pcw", "depth_bin", phase_col], observed=True).size()
+                      .unstack(phase_col, fill_value=0))
+                fr = ct.div(ct.sum(axis=1).replace(0, np.nan), axis=0)
+                fr.insert(0, "n_cells", ct.sum(axis=1))
+                med = d.groupby([class_col, "age_pcw", "depth_bin"], observed=True)["total_umis"].median()
+                fr.insert(1, "median_umis", med.reindex(fr.index).to_numpy())
+                fr = fr.reset_index().rename(columns={class_col: "cell_class", "age_pcw": "age"})
+                man.write(fr, "phase_fractions_by_cell_class_x_age_x_depth",
+                          "Cell-cycle phase composition per cell class x age x UMI quintile "
+                          "(quintiles within each class) -- for depth-matched phase shares",
+                          subdir=SUBDIR)
 
         summary = work.groupby(class_col, observed=True).agg(
             n_cells=("is_cycling", "size"),
