@@ -102,6 +102,7 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | `LIMIT_CELLS` | unset | first N cells — smoke test; outputs are partial |
 | `AIM_EXCLUSIONS` | `exclusions.csv` | cells to leave out (see the top-level README); `none` disables |
 | `AIM_GENE_LISTS` | `/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on` | folder of gene lists (one per file) analysed in step 3 and always exported by stage 2 |
+| `AIM_COLLAPSE_LISTS` | `GWAS` | regex of list names collapsed to one gene per locus in step 3; `none` disables |
 | `AIM_DOWNSTREAM_OUT` | `/miridan-data/annaludmir/aim_downstream/results` | where stage 4 writes step-3 results |
 | `DOWNSTREAM` | `true` | `false` makes `submit_all.sh` stop after stage 3 |
 | `CHUNK_SIZE` | `50000` | cells per streaming chunk (stage 2) |

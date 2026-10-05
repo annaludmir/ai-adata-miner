@@ -1,6 +1,6 @@
 # Step 3 report: downstream analyses
 
-_Built 2026-10-04 13:16 UTC from 8 analyses over `csv_exports/`._
+_Built 2026-10-05 05:40 UTC from 8 analyses over `csv_exports/`._
 
 Read this first. Three facts about the data constrain every result below
 (details in 01):

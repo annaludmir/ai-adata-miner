@@ -58,6 +58,10 @@ These come from the audit (01), not from habit:
   expressed, and highly expressed genes pass tests more often.
 - **cortex is primary for within-class questions.** human_dev classes pool
   regions whose sampling changes with age.
+- **GWAS lists count each locus once.** Lists whose name matches
+  `AIM_COLLAPSE_LISTS` (default `GWAS`) keep one gene per locus, because
+  neighbouring genes at one association signal are often co-regulated and
+  would otherwise inflate coherence and enrichment.
 - **Co-expression is measured across fine clusters, and nulls are matched on
   level and spread.** Clusters need at least 100 cells and must not be
   dominated by one donor. Random comparison sets draw each gene from the same

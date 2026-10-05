@@ -61,6 +61,7 @@ def coverage(out: C.Output, lists: dict[str, list[str]]) -> pd.DataFrame:
                    "n_matched": len(syms),
                    "n_matched_by_case": int((m.match == "case").sum()),
                    "n_matched_by_ensembl": int((m.match == "ensembl").sum()),
+                   "n_matched_via_other_file": int((m.match == "other_file_symbol").sum()),
                    "n_missing": int((m.match == "missing").sum()),
                    "missing_examples": "|".join(m.loc[m.match == "missing", "input"].head(10))}
             for chem in C.CHEMISTRIES:
@@ -80,6 +81,34 @@ def coverage(out: C.Output, lists: dict[str, list[str]]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
     out.write(df, "list_coverage",
               "Per list x dataset: entries matched, exported in pseudobulk, expressed")
+    return df
+
+
+def loci(out: C.Output, lists: dict[str, list[str]]) -> pd.DataFrame:
+    """Genes that share a locus, per list; GWAS-style lists are collapsed to one per locus."""
+    rows, genes = [], []
+    for ds in C.DATASETS:
+        raw = C.mapped_lists(ds, collapse=False)
+        for name in lists:
+            L = C.gene_loci(raw.get(name, []), ds)
+            multi = L[L.genes_in_locus > 1]
+            big = (multi.groupby("locus")["symbol"].apply(list).sort_values(key=lambda s: -s.str.len())
+                   if len(multi) else pd.Series(dtype=object))
+            rows.append({"dataset": ds, "gene_list": name, "collapsed": C.collapses(name),
+                         "n_genes": len(L), "n_loci": int(L.locus.nunique()),
+                         "n_multi_gene_loci": int(multi.locus.nunique()),
+                         "genes_in_multi_gene_loci": len(multi),
+                         "largest_locus": ", ".join(big.iloc[0][:8]) + (" ..." if len(big) and len(big.iloc[0]) > 8 else "")
+                         if len(big) else "",
+                         "largest_locus_size": len(big.iloc[0]) if len(big) else 1})
+            genes.append(L.assign(dataset=ds, gene_list=name, collapsed=C.collapses(name)))
+    df = pd.DataFrame(rows)
+    out.write(df, "list_loci",
+              f"Per list: genes sharing a locus (same chromosome, chained within "
+              f"{C.LOCUS_WINDOW / 1e6:g} Mb); lists matching '{C.COLLAPSE_PATTERN}' are collapsed "
+              "to one gene per locus in every analysis")
+    out.write(pd.concat(genes, ignore_index=True), "list_gene_loci",
+              "Per list gene: chromosome, position, locus, and whether it represents its locus")
     return df
 
 
@@ -198,6 +227,7 @@ def main() -> None:
     rng = np.random.default_rng(C.SEED)
 
     cov = coverage(out, lists)
+    loc = loci(out, lists)
     ovl = overlaps(out, lists)
 
     pref = []
@@ -239,6 +269,22 @@ def main() -> None:
                     " Some list genes fell below the pseudobulk UMI cut in these exports ("
                     + ", ".join(dropped.gene_list) + "); re-running stage 2 with the gene-list "
                     "folder in place exports them (lists join the panels)."))
+    col = loc[loc.collapsed]
+    if len(col):
+        f.append(f"**GWAS-style lists collapsed to one gene per locus** (name matches "
+                 f"'{C.COLLAPSE_PATTERN}'; neighbours within {C.LOCUS_WINDOW / 1e6:g} Mb chain into "
+                 "one locus, first-listed gene kept): "
+                 + "; ".join(f"{r.gene_list} ({r.dataset}) {r.n_genes} genes -> {r.n_loci} loci"
+                             + (f", largest {r.largest_locus_size} genes ({r.largest_locus})"
+                                if r.largest_locus_size > 2 else "")
+                             for r in col.itertuples()) + ".")
+    unc = loc[~loc.collapsed & (loc.largest_locus_size >= 3)]
+    if len(unc):
+        f.append("**Curated lists with clustered neighbours** (not collapsed; check "
+                 "list_gene_loci.csv if a result hinges on them): "
+                 + "; ".join(f"{r.gene_list} ({r.dataset}): {r.n_multi_gene_loci} multi-gene loci, "
+                             f"largest {r.largest_locus_size} ({r.largest_locus})"
+                             for r in unc.drop_duplicates("gene_list").itertuples()) + ".")
     if not ovl.empty:
         strong = ovl[(ovl.q < 0.05) & (ovl.fold >= 2)]
         f.append("**Overlaps**: "
@@ -290,8 +336,13 @@ def main() -> None:
         "For each user gene list: what do these data see of it, how does it relate to the "
         "other lists, where is it expressed, and does it move with age as a group?",
         [f"Lists read from `{src}` (CSV with a 'gene' column, or its first column; or one "
-         "gene per line). Entries matched to symbols exactly, case-insensitively, or via "
-         "Ensembl id.",
+         "gene per line). Entries matched to symbols exactly, case-insensitively, via "
+         "Ensembl id, or via the other file's annotation (a symbol known in one file carried "
+         "over through the shared Ensembl id -- the files use different symbol versions).",
+         f"Lists whose name matches '{C.COLLAPSE_PATTERN}' (AIM_COLLAPSE_LISTS) keep one gene "
+         f"per locus -- genes on one chromosome chained within {C.LOCUS_WINDOW / 1e6:g} Mb, the "
+         "first-listed kept -- in every analysis here and in 07/08: a GWAS hit names all its "
+         "neighbours, which are often co-regulated (e.g. the 6p22 histone cluster).",
          "Overlap: hypergeometric against genes detected in human_dev (plus all set "
          "members), BH across pairs.",
          "Cell-class preference: as 04 part A -- log2 TMM-CPM per (class, age point), gene "

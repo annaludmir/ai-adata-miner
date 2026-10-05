@@ -580,7 +580,7 @@ def gene_lists_dir() -> Path:
 
 
 _LISTS_CACHE: dict[str, dict[str, list[str]]] = {}
-_MAPPED_CACHE: dict[str, dict[str, list[str]]] = {}
+_MAPPED_CACHE: dict[tuple, dict[str, list[str]]] = {}
 
 
 def gene_lists_label() -> str:
@@ -614,18 +614,26 @@ _ID_MAP: dict[str, pd.DataFrame] = {}
 def map_genes(genes, dataset: str) -> pd.DataFrame:
     """Resolve list entries to this dataset's gene symbols.
 
-    Exact symbol first, then case-insensitive, then Ensembl id (version
-    stripped). Returns input, symbol and how it matched ('missing' if not).
+    In order: exact symbol; case-insensitive; Ensembl id (version stripped);
+    and finally the OTHER file's annotation -- a symbol known there is carried
+    over through the shared Ensembl id. The two files use different symbol
+    versions (cortex has HIST1H1C where human_dev has H1-2 after the 2020 HGNC
+    histone renaming), so this recovers renamed genes without an alias table.
+    Returns input, symbol and how it matched ('missing' if not).
     """
-    if dataset not in _ID_MAP:
-        g = csv("_cross_dataset", "gene_id_map.csv", low_memory=False)
-        _ID_MAP[dataset] = g[g["dataset"] == dataset]
-    g = _ID_MAP[dataset]
+    if "_all" not in _ID_MAP:
+        _ID_MAP["_all"] = csv("_cross_dataset", "gene_id_map.csv", low_memory=False)
+    allg = _ID_MAP["_all"]
+    g = allg[allg["dataset"] == dataset]
+    o = allg[allg["dataset"] != dataset]
     symbols = set(g["symbol"].astype(str))
     upper = {}
-    for s in g["symbol"].astype(str):
-        upper.setdefault(s.upper(), s)
+    for x in g["symbol"].astype(str):
+        upper.setdefault(x.upper(), x)
     ensg = dict(zip(g["accession_base"].astype(str), g["symbol"].astype(str)))
+    other = {}
+    for sym, acc in zip(o["symbol"].astype(str), o["accession_base"].astype(str)):
+        other.setdefault(sym.upper(), acc)
     rows = []
     for x in genes:
         x = str(x).strip()
@@ -635,20 +643,82 @@ def map_genes(genes, dataset: str) -> pd.DataFrame:
             rows.append((x, upper[x.upper()], "case"))
         elif x.split(".")[0] in ensg:
             rows.append((x, ensg[x.split(".")[0]], "ensembl"))
+        elif x.upper() in other and other[x.upper()] in ensg:
+            rows.append((x, ensg[other[x.upper()]], "other_file_symbol"))
         else:
             rows.append((x, "", "missing"))
     return pd.DataFrame(rows, columns=["input", "symbol", "match"])
 
 
-def mapped_lists(dataset: str) -> dict[str, list[str]]:
-    """User lists as unique symbols of this dataset (unmatched entries dropped)."""
-    if dataset not in _MAPPED_CACHE:
+# GWAS-derived lists name every gene near an associated variant, so one locus
+# can contribute many co-regulated neighbours (16 HIST1 histones at 6p22 in a
+# bipolar list made it look "mitotic"). Lists whose name matches this regex are
+# collapsed to one gene per locus; 'none' disables. Curated lists are not.
+COLLAPSE_PATTERN = os.environ.get("AIM_COLLAPSE_LISTS", "GWAS")
+LOCUS_WINDOW = 1_000_000    # genes within this distance (bp) chain into one locus
+_COORDS: dict[str, pd.DataFrame] = {}
+
+
+def collapses(name: str) -> bool:
+    return (COLLAPSE_PATTERN.lower() != "none"
+            and re.search(COLLAPSE_PATTERN, name, flags=re.IGNORECASE) is not None)
+
+
+def gene_loci(symbols: list[str], dataset: str) -> pd.DataFrame:
+    """Group genes into loci by position: same chromosome, chained within LOCUS_WINDOW.
+
+    Returns symbol, chromosome, start, end, locus id, genes in the locus, and
+    whether the gene represents its locus (the first in the given order --
+    lists usually put the lead gene first). Genes without coordinates are
+    their own locus.
+    """
+    if dataset not in _COORDS:
+        g = csv("_cross_dataset", "gene_id_map.csv", low_memory=False)
+        g = g[g["dataset"] == dataset].drop_duplicates("symbol")
+        _COORDS[dataset] = pd.DataFrame({
+            "chrom": g["Chromosome"].astype(str).str.replace("^chr", "", regex=True).to_numpy(),
+            "start": pd.to_numeric(g["Start"], errors="coerce").to_numpy(),
+            "end": pd.to_numeric(g["End"], errors="coerce").to_numpy()},
+            index=g["symbol"].astype(str).to_numpy())
+    co = _COORDS[dataset]
+    df = pd.DataFrame({"symbol": symbols, "order": range(len(symbols))})
+    df = df.join(co, on="symbol")
+    df["locus"] = -1
+    has = df["start"].notna() & df["end"].notna()
+    next_id = 0
+    for _, grp in df[has].sort_values(["chrom", "start"]).groupby("chrom", sort=False):
+        reach = -np.inf
+        for i, r in grp.iterrows():
+            if r.start > reach + LOCUS_WINDOW:
+                next_id += 1
+            df.loc[i, "locus"] = next_id
+            reach = max(reach, r.end) if r.start <= reach + LOCUS_WINDOW else r.end
+    for i in df.index[~has]:
+        next_id += 1
+        df.loc[i, "locus"] = next_id
+    df["genes_in_locus"] = df.groupby("locus")["symbol"].transform("size")
+    first = df.sort_values("order").drop_duplicates("locus").index
+    df["representative"] = df.index.isin(first)
+    return df.sort_values("order").drop(columns="order")
+
+
+def mapped_lists(dataset: str, collapse: bool = True) -> dict[str, list[str]]:
+    """User lists as unique symbols of this dataset (unmatched entries dropped).
+
+    With collapse=True, lists matching COLLAPSE_PATTERN keep one gene per locus.
+    """
+    key = (dataset, collapse)
+    if key not in _MAPPED_CACHE:
         out = {}
         for name, genes in gene_lists().items():
             m = map_genes(genes, dataset)
-            out[name] = list(dict.fromkeys(m.loc[m.match != "missing", "symbol"]))
-        _MAPPED_CACHE[dataset] = out
-    return _MAPPED_CACHE[dataset]
+            syms = list(dict.fromkeys(m.loc[m.match != "missing", "symbol"]))
+            if collapse and collapses(name):
+                loci = gene_loci(syms, dataset)
+                syms = list(loci.loc[loci.representative, "symbol"])
+            out[name] = syms
+        _MAPPED_CACHE[key] = out
+    return _MAPPED_CACHE[key]
 
 
 # ---------------------------------------------------------------------------

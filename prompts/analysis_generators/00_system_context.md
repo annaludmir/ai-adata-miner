@@ -24,7 +24,9 @@ CPM, exact permutation tests, signed Stouffer replication, SUMMARY.md writer)
 rather than re-implementing it.
 For gene groups and co-expression, reuse `cluster_expression`,
 `coexpr_contexts`, `matched_sets` and `coherence_from_sums` (see 07 and 08).
-Gene lists are read with `gene_lists()` and `mapped_lists(dataset)`.
+Gene lists are read with `gene_lists()` and `mapped_lists(dataset)`. The latter
+collapses GWAS-style lists to one gene per locus (`gene_loci`). Keep that
+collapsing whenever a result could be inflated by co-regulated neighbours.
 
 ## Non-negotiable statistical rules
 

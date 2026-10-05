@@ -67,6 +67,19 @@ The lists join the gene panels as group `user_lists`. Stage 2 then always
 exports their genes, however lowly expressed, and scripts 11 and 17 score them.
 Step-3 analyses 06-08 study them as groups.
 
+GWAS-derived lists name every gene near an associated variant, and neighbouring
+genes are often co-regulated. In one bipolar list, 16 histones from the 6p22
+cluster made the whole list look like a cell-division program. So in step 3,
+lists whose name contains `GWAS` keep one gene per locus: genes on one
+chromosome within 1 Mb of each other chain into a single locus, and the gene
+listed first is kept. `AIM_COLLAPSE_LISTS=<regex>` changes which lists this
+applies to, and `none` turns it off. 06 reports every list's multi-gene loci.
+
+Step 3 matches list genes in four ways: exact symbol, case-insensitive symbol,
+Ensembl id, and finally the other file's annotation. The fourth catches genes
+renamed between the two files' annotations; for example, cortex calls a
+histone HIST1H1C where human_dev calls it H1-2.
+
 ## Running
 
 ```bash
