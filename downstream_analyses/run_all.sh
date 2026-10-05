@@ -8,7 +8,7 @@
 #   PYTHON=/path/to/python ./downstream_analyses/run_all.sh
 #   AI_ADATA_OUT_ROOT=/elsewhere/csv_exports ./downstream_analyses/run_all.sh
 #
-# Order matters: 02 reads 01's sex calls; 04 and 06 read 03's trends.
+# Order matters: 02 reads 01's sex calls; 04, 06 and 09 read 03's trends; 09 reads 08's modules.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

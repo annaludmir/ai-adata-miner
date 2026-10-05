@@ -10,6 +10,7 @@ Outputs (csv_exports/<dataset>/03_cellcycle/)
   phase_fractions_by_<grouping>.csv   cycle-phase composition per group
   cycle_scores_by_<grouping>.csv      continuous score stats per group
   proliferation_trajectory.csv        cell class x week: cycling fraction + scores
+  phase_fractions_by_cell_class_x_{age,donor}.csv  phase composition per class x week / donor
   cycling_summary.csv                 one row per cell class, overall
 """
 from __future__ import annotations
@@ -121,6 +122,23 @@ def run(key: str, args, chem: str | None = None,
         man.write(traj.sort_values(["cell_class", "age_pcw"]), "proliferation_trajectory",
                   "Cycling fraction and cycle scores per cell class per week -- "
                   "shows when each progenitor class exits the cycle", subdir=SUBDIR)
+
+        # Phase composition per cell class x week (and x donor): the input for
+        # cell-cycle kinetics within a progenitor type, e.g. whether cycling
+        # progenitors spend a growing share of their time in G1 as
+        # neurogenesis proceeds.
+        if phase_col is not None:
+            for by, label in (("age_pcw", "age"), (resolve_role(obs, "donor"), "donor")):
+                if by is None or by not in work.columns:
+                    continue
+                ct = (work.groupby([class_col, by, phase_col], observed=True).size()
+                      .unstack(phase_col, fill_value=0))
+                fr = ct.div(ct.sum(axis=1).replace(0, np.nan), axis=0)
+                fr.insert(0, "n_cells", ct.sum(axis=1))
+                fr = fr.reset_index().rename(columns={class_col: "cell_class", by: label})
+                fr["below_min_cells"] = fr["n_cells"] < config.MIN_CELLS_PER_GROUP
+                man.write(fr, f"phase_fractions_by_cell_class_x_{label}",
+                          f"Cell-cycle phase composition per cell class x {label}", subdir=SUBDIR)
 
         summary = work.groupby(class_col, observed=True).agg(
             n_cells=("is_cycling", "size"),

@@ -77,7 +77,10 @@ cortex vs human_dev and v2 vs v3 concordance (03, 05); user gene lists, covering
 coverage, overlap, cell-class preference and age coordination (06); gene-list
 co-expression coherence, cross-validated sub-modules and candidate members (07);
 WGCNA-style co-expression modules with preservation across donor sets, hub
-genes, age dynamics and list enrichment (08).
+genes, age dynamics, list enrichment and seed-panel labels (08); cell-cycle
+programs, covering proliferation and G1/S/G2M shares over development, a gene
+phase map, gene-set phase profiles, and list age trends with proliferation
+genes set aside (09).
 
 These all run off `csv_exports/`. Discover inputs via `csv_exports/<dataset>/_manifest.csv`.
 

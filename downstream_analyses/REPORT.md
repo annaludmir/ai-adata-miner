@@ -1,6 +1,6 @@
 # Step 3 report: downstream analyses
 
-_Built 2026-10-05 06:05 UTC from 8 analyses over `csv_exports/`._
+_Built 2026-10-05 06:37 UTC from 9 analyses over `csv_exports/`._
 
 Read this first. Three facts about the data constrain every result below
 (details in 01):
@@ -27,6 +27,7 @@ Read this first. Three facts about the data constrain every result below
 - [06. Gene lists: coverage, overlap, cell-class preference and age coordination](#06-gene-lists-coverage-overlap-cell-class-preference-and-age-coordination)
 - [07. Gene-list co-expression: do list genes work as a group?](#07-gene-list-co-expression-do-list-genes-work-as-a-group)
 - [08. Co-expression modules across fine clusters](#08-co-expression-modules-across-fine-clusters)
+- [09. Cell-cycle programmes: proliferation over development and a phase map of genes](#09-cell-cycle-programmes-proliferation-over-development-and-a-phase-map-of-genes)
 
 ## 01. Data audit: what the exports can support
 
@@ -125,34 +126,50 @@ Method, limitations and output files: [results/07_gene_list_coherence/SUMMARY.md
 **Question.** Without starting from a list: which groups of genes co-vary across cell clusters robustly enough to be found again in independent donors, where do they peak, how do they change with age, and which gene lists concentrate in them?
 
 - **cortex / across clusters: 11 modules, 7 robust** (re-discovered in each chemistry alone and preserved in the other; cut r >= 0.50)
-  - CX01 (225 genes; peak Neuronal IPC; hubs HMGB2, NUSAP1, SMC4, PIMREG, KIFC1)
+  - CX01 [G2/M phase] (225 genes; peak Neuronal IPC; hubs HMGB2, NUSAP1, SMC4, PIMREG, KIFC1)
   - CX02 (221 genes; peak Neuron; hubs MAPT, XPR1, SHTN1, SCG5, SPTAN1; holds seed:epilepsy_dee (6, 7.0x), seed:synaptic_and_channels (7, 3.4x))
-  - CX03 (165 genes; peak Glioblast; hubs GULP1, SOX9, GLI3, GATM, CLU)
-  - CX04 (156 genes; peak Glioblast/Neuronal IPC; hubs GMNN, PCNA, CENPK, TYMS, HELLS)
+  - CX03 [radial glia markers] (165 genes; peak Glioblast; hubs GULP1, SOX9, GLI3, GATM, CLU)
+  - CX04 [S phase] (156 genes; peak Glioblast/Neuronal IPC; hubs GMNN, PCNA, CENPK, TYMS, HELLS)
   - CX05 (113 genes; peak Neuron; hubs FGF12, GPR22, GAS7, ZBTB38, FXYD7)
   - CX07 (79 genes; peak Neuroblast; hubs GPC2, MLLT11, TAGLN3, DISP3, RASGEF1B)
-  - CX09 (30 genes; peak Neuronal IPC; hubs NHLH1, ELAVL2, EOMES, INSM1, NEUROD4; falls with age in Neuronal IPC)
+  - CX09 [neuronal ipc markers] (30 genes; peak Neuronal IPC; hubs NHLH1, ELAVL2, EOMES, INSM1, NEUROD4; falls with age in Neuronal IPC)
 - **cortex / within class: 9 modules, 6 robust** (re-discovered in each chemistry alone and preserved in the other; cut r >= 0.50)
   - CXw01 (241 genes; peak Neuron; hubs MAPT, RAB3A, RTN1, SEZ6L2, TTC9B; holds seed:synaptic_and_channels (10, 3.8x), seed:asd_high_confidence (5, 3.9x))
-  - CXw02 (199 genes; peak Neuronal IPC; hubs NUSAP1, HMGB2, CCNA2, GTSE1, TPX2)
-  - CXw03 (169 genes; peak Glioblast; hubs SOX2, CLU, GULP1, SOX9, PON2)
-  - CXw04 (104 genes; peak Neuronal IPC; hubs TYMS, GMNN, CENPK, PCNA, ORC6)
+  - CXw02 [G2/M phase] (199 genes; peak Neuronal IPC; hubs NUSAP1, HMGB2, CCNA2, GTSE1, TPX2)
+  - CXw03 [radial glia markers] (169 genes; peak Glioblast; hubs SOX2, CLU, GULP1, SOX9, PON2)
+  - CXw04 [S phase] (104 genes; peak Neuronal IPC; hubs TYMS, GMNN, CENPK, PCNA, ORC6)
   - CXw05 (81 genes; peak Neuron; hubs CNTN1, MEF2C, DACT1, SCN2A, VSTM2L)
-  - CXw08 (26 genes; peak Neuronal IPC; hubs NHLH1, ELAVL2, NEUROD4, EOMES, HES6; falls with age in Neuronal IPC, rises with age in Radial glia)
+  - CXw08 [neuronal ipc markers] (26 genes; peak Neuronal IPC; hubs NHLH1, ELAVL2, NEUROD4, EOMES, HES6; falls with age in Neuronal IPC, rises with age in Radial glia)
 - **human_dev / across clusters: 15 modules, 6 robust** (re-discovered in each chemistry alone and preserved in the other; cut r >= 0.50)
-  - HD01 (272 genes; peak Neuronal IPC, Telencephalon/Forebrain; hubs SMC4, CENPK, MAD2L1, KIF11, CKS1B)
+  - HD01 [G2/M phase; S phase] (272 genes; peak Neuronal IPC, Telencephalon/Forebrain; hubs SMC4, CENPK, MAD2L1, KIF11, CKS1B)
   - HD02 (261 genes; peak Fibroblast/Vascular, Medulla/Hindbrain; hubs ANXA5, SUCLG2, SERPINH1, STK3, PLIN3; rises with age in Vascular)
-  - HD03 (225 genes; peak Neuron, Pons; hubs TMEM35A, SV2A, SCN3B, PTPN5, JPH4)
+  - HD03 (225 genes; peak Neuron, Pons; hubs TMEM35A, SV2A, SCN3B, PTPN5, JPH4; holds seed:synaptic_and_channels (10, 4.1x))
   - HD04 (72 genes; peak Neuroblast, Cerebellum/Pons; hubs TUBB3, CD24, GPC2, MLLT11, SMPD3; falls with age in Neuroblast, falls with age in Neuron)
   - HD05 (43 genes; peak Glioblast, Diencephalon/Hindbrain; hubs NME5, C9orf116, SPATA17, CFAP54, ENKUR; falls with age in Neuronal IPC)
   - HD11 (25 genes; peak Neuron, Diencephalon/Pons; hubs MTUS2, TENM2, TAC1, AC011369.1, PLEKHA6; falls with age in Neuroblast, falls with age in Neuron)
 - **human_dev / within class: 6 modules, 4 robust** (re-discovered in each chemistry alone and preserved in the other; cut r >= 0.44)
-  - HDw01 (197 genes; peak Neuronal IPC, Telencephalon/Forebrain; hubs TOP2A, CDK1, KIFC1, KIF11, GTSE1; rises with age in Neuronal IPC)
+  - HDw01 [G2/M phase; S phase] (197 genes; peak Neuronal IPC, Telencephalon/Forebrain; hubs TOP2A, CDK1, KIFC1, KIF11, GTSE1; rises with age in Neuronal IPC)
   - HDw02 (48 genes; peak Glioblast, Diencephalon/Hindbrain; hubs NME5, SPATA17, KIF9, MOK, C5orf49; falls with age in Neuronal IPC)
   - HDw03 (29 genes; peak Neuron, Pons/Hindbrain; hubs MAP1LC3A, LY6H, PCSK1N, DDX25, FUCA1)
   - HDw04 (28 genes; peak Glioblast/Radial glia, Pons/Midbrain; hubs IRX2, IRX3, IRX1, C5orf38, IRX5; falls with age in Neuronal IPC, falls with age in Radial glia, falls with age in Neuroblast, falls with age in Neuron)
-- **Gene sets concentrated in robust modules** (q < 0.05, >= 2x matched expectation): seed:asd_high_confidence: cortex CXw01 (5 genes, 3.9x) | seed:epilepsy_dee: cortex CX02 (6 genes, 7.0x) | seed:synaptic_and_channels: cortex CXw01 (10 genes, 3.8x); cortex CX02 (7 genes, 3.4x).
+- **Gene sets concentrated in robust modules** (q < 0.05, >= 2x matched expectation): seed:asd_high_confidence: cortex CXw01 (5 genes, 3.9x) | seed:epilepsy_dee: cortex CX02 (6 genes, 7.0x) | seed:synaptic_and_channels: human_dev HD03 (10 genes, 4.1x); cortex CXw01 (10 genes, 3.8x); cortex CX02 (7 genes, 3.4x).
 - **cortex and human_dev share 2 of 20 cortex modules** (Jaccard >= 0.3 with a human_dev module; same donors, so this is reproducibility of processing and regional pooling, not replication).
 
 Method, limitations and output files: [results/08_coexpression_modules/SUMMARY.md](results/08_coexpression_modules/SUMMARY.md)
+
+## 09. Cell-cycle programmes: proliferation over development and a phase map of genes
+
+**Question.** How does proliferation change over development within progenitor types; which genes and gene groups follow proliferation, and which lean to S or G2/M; and do list-level age trends in progenitors survive once proliferation-linked genes are set aside?
+
+- **cortex: proliferation over development in progenitors** -- fraction cycling falls with age in Radial glia (0.88->0.763 in v2, 0.746->0.6 in v3; replicated).
+- **human_dev: no replicated proliferation trend in progenitors.**
+- **G1 lengthening not testable yet**: phase fractions per cell class x age are exported by script 03 from this version on; re-run stage 1 to add them.
+- **cortex gene phase map** (10,439 genes): 2323 proliferative (251 lean S, 397 lean G2/M), 2342 anti-proliferative, 2292 cycle-independent.
+- **human_dev gene phase map** (12,018 genes): 3129 proliferative, 2903 anti-proliferative, 2655 cycle-independent.
+- **Sanity check against the seed phase panels** (partly circular: phase calls come from such genes): cortex g2m_phase: lean -16.3/-18.2 null SDs (+ = S), 0 S / 47 G2/M genes; cortex s_phase: lean +12.1/+12.0 null SDs (+ = S), 33 S / 0 G2/M genes.
+- **cortex: gene sets tied to proliferation, replicated** -- seed:g2m_phase proliferative, leans G2/M (rho +0.58/+0.65 vs +0.07 matched; 0 S-lean, 47 G2/M-lean genes); seed:s_phase proliferative, leans S (rho +0.75/+0.74 vs +0.04 matched; 33 S-lean, 0 G2/M-lean genes); seed:asd_high_confidence anti-proliferative (rho -0.30/-0.28 vs +0.01 matched); seed:chromatin_transcription_regulators anti-proliferative (rho -0.25/-0.22 vs +0.00 matched; 0 S-lean, 1 G2/M-lean genes); seed:epilepsy_dee anti-proliferative (rho -0.30/-0.24 vs +0.03 matched); seed:id_dd_dominant anti-proliferative (rho -0.14/-0.15 vs +0.00 matched); seed:synaptic_and_channels anti-proliferative (rho -0.53/-0.44 vs +0.04 matched).
+- **cortex: proliferative modules with a replicated phase lean** -- CX01 leans G2/M; CX04 leans S; CXw02 leans G2/M; CXw04 leans S.
+- **human_dev: gene sets tied to proliferation, replicated** -- seed:g2m_phase proliferative (rho +0.81/+0.78 vs +0.04 matched); seed:s_phase proliferative (rho +0.75/+0.71 vs +0.06 matched); seed:asd_high_confidence anti-proliferative (rho -0.26/-0.26 vs -0.03 matched); seed:epilepsy_dee anti-proliferative (rho -0.24/-0.24 vs +0.03 matched); seed:synaptic_and_channels anti-proliferative (rho -0.48/-0.45 vs -0.04 matched).
+
+Method, limitations and output files: [results/09_cell_cycle_programs/SUMMARY.md](results/09_cell_cycle_programs/SUMMARY.md)
 

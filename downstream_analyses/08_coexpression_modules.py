@@ -66,6 +66,17 @@ MIN_JACCARD = 0.3
 N_RANDOM = 1000
 N_HUBS = 10
 CONTEXTS = ("across_clusters", "within_class")
+ANNOTATION_GROUPS = ("cell_cycle", "marker", "patterning")
+PANEL_LABELS = {"cell_cycle:g2m_phase": "G2/M phase", "cell_cycle:s_phase": "S phase"}
+
+
+def pretty_panel(name: str) -> str:
+    """'cell_cycle:g2m_phase' -> 'G2/M phase'; 'marker:radial_glia' -> 'radial glia markers'."""
+    if name in PANEL_LABELS:
+        return PANEL_LABELS[name]
+    grp, panel = name.split(":", 1)
+    suffix = {"marker": "markers", "patterning": "patterning"}.get(grp, "")
+    return f"{panel.replace('_', ' ')} {suffix}".strip()
 MAX_LISTED = 8
 
 
@@ -109,6 +120,23 @@ def held_out_p(Zn: np.ndarray, bins: np.ndarray, idx: np.ndarray, rng) -> tuple[
     return obs, float(null.mean()), float(((null >= obs).sum() + 1) / (N_RANDOM + 1))
 
 
+def matched_p(null: np.ndarray, obs: float) -> float:
+    """One-sided p of an overlap against its matched-null draws.
+
+    Empirical while any draw reaches the observed value; beyond the null's
+    resolution (no draw reaches it), a normal approximation from the null's
+    mean and SD. Otherwise every strong overlap ties at 1/(N+1), and with a few
+    hundred tests BH cannot pass even a complete overlap.
+    """
+    k = int((null >= obs).sum())
+    if k > 0:
+        return float((k + 1) / (null.size + 1))
+    sd = float(null.std())
+    if sd <= 0:
+        return float(1 / (null.size + 1))
+    return float(max(stats.norm.sf((obs - null.mean()) / sd), 1e-300))
+
+
 def jaccard(a, b) -> float:
     a, b = set(a), set(b)
     return len(a & b) / len(a | b) if a | b else 0.0
@@ -139,8 +167,16 @@ def main() -> None:
         for pname, g in pan[pan.panel_group == "ndd"].groupby("panel"):
             sets[f"seed:{pname}"] = list(g.gene)
         gene_sets[ds] = sets
+    # seed reference panels used only to label modules (cell-cycle phase,
+    # cell-class markers, patterning) -- not reported as findings themselves
+    annot_sets = {}
+    for ds in C.DATASETS:
+        pan = C.panels(C.ns(ds, "v2"))
+        annot_sets[ds] = {f"{grp}:{pname}": list(g.gene)
+                          for (grp, pname), g in pan[pan.panel_group.isin(ANNOTATION_GROUPS)]
+                          .groupby(["panel_group", "panel"])}
 
-    mod_rows, mem_rows, age_rows, enr_rows, match_rows = [], [], [], [], []
+    mod_rows, mem_rows, age_rows, enr_rows, match_rows, ann_rows = [], [], [], [], [], []
     eig_tables = {}
     for ds in C.DATASETS:
         lcs = {c: data[(ds, c)][0] for c in C.CHEMISTRIES}
@@ -262,7 +298,8 @@ def main() -> None:
             member = np.zeros((len(order), len(universe)), dtype=float)
             for i, lab in enumerate(order):
                 member[i, uni.get_indexer(mods[lab])] = 1.0
-            for sname, sgenes in gene_sets[ds].items():
+            for sets, rows_out in ((gene_sets[ds], enr_rows), (annot_sets[ds], ann_rows)):
+              for sname, sgenes in sets.items():
                 idx = uni.get_indexer([g for g in dict.fromkeys(sgenes) if g in uni])
                 idx = idx[idx >= 0]
                 if idx.size < 5:
@@ -272,16 +309,33 @@ def main() -> None:
                 null = np.stack([member[:, r].sum(axis=1) for r in rand], axis=1)
                 for i, lab in enumerate(order):
                     exp = float(null[i].mean())
-                    enr_rows.append({"dataset": ds, "context": cname, "gene_set": sname,
+                    rows_out.append({"dataset": ds, "context": cname, "gene_set": sname,
                                      "module": names[lab], "set_genes_in_universe": int(idx.size),
                                      "module_size": len(mods[lab]), "overlap": int(obs[i]),
                                      "expected_matched": exp,
                                      "fold": obs[i] / exp if exp > 0 else np.nan,
-                                     "p_matched": float(((null[i] >= obs[i]).sum() + 1) / (N_RANDOM + 1)),
+                                     "p_matched": matched_p(null[i], obs[i]),
                                      "genes": "|".join(uni[idx][member[i, idx] > 0])})
             eig_tables[(ds, cname)] = scores
 
     mods_df = pd.DataFrame(mod_rows)
+    # label modules from the reference panels they concentrate
+    ann = pd.DataFrame(ann_rows)
+    if not ann.empty:
+        ann["q"] = np.nan
+        for _, ix in ann.groupby(["dataset", "context"]).groups.items():
+            ann.loc[ix, "q"] = C.bh(ann.loc[ix, "p_matched"])
+        ann = ann.sort_values(["dataset", "context", "p_matched"])
+        hits = ann[(ann.q < 0.05) & (ann.fold >= 2)]
+        labels = (hits.groupby(["dataset", "context", "module"])["gene_set"]
+                  .apply(lambda g: "; ".join(pretty_panel(x) for x in list(g)[:2])))
+        mods_df["annotation"] = [labels.get((r.dataset, r.context, r.module), "")
+                                 for r in mods_df.itertuples()]
+        out.write(ann, "module_annotation",
+                  "Overlap of each module with seed reference panels (cell-cycle phase, cell-class "
+                  "markers, patterning) vs matched random sets; used to label modules")
+    else:
+        mods_df["annotation"] = ""
     mem_df = pd.DataFrame(mem_rows)
     out.write(mods_df, "modules",
               "Per module: size, robustness (independent discovery + held-out preservation), "
@@ -362,7 +416,8 @@ def main() -> None:
                        & (enr.q < 0.05) & (enr.fold >= 2)] if not enr.empty else enr
             stxt = ("; holds " + ", ".join(f"{s.gene_set} ({s.overlap}, {s.fold:.1f}x)"
                                            for s in sets.itertuples())) if len(sets) else ""
-            items.append(f"{r.module} ({r.n_genes} genes; peak {peak}{reg}; hubs "
+            tag = f" [{r.annotation}]" if getattr(r, "annotation", "") else ""
+            items.append(f"{r.module}{tag} ({r.n_genes} genes; peak {peak}{reg}; hubs "
                          f"{', '.join(r.hub_genes.split('|')[:5])}{ttxt}{stxt})")
         if len(rob) > MAX_LISTED:
             items.append(f"(+{len(rob) - MAX_LISTED} more robust modules in modules.csv)")
@@ -409,8 +464,11 @@ def main() -> None:
          f"Jaccard >= {MIN_JACCARD}).",
          "Age trends: module score (mean z of members over a class's age points, TMM log CPM) "
          "vs age, exact permutation p, v2/v3 signed Stouffer, tiered as elsewhere.",
-         "Enrichment: overlap vs random sets matched on level x spread within the universe; "
-         "BH per dataset x context."],
+         "Enrichment: overlap vs random sets matched on level x spread within the universe "
+         "(empirical p; beyond the null's resolution, a normal approximation from its mean and "
+         "SD); BH per dataset x context.",
+         "Labels in [brackets]: the seed reference panels (cell-cycle phase, cell-class markers, "
+         "patterning) a module concentrates (q < 0.05, >= 2x matched expectation; top two)."],
         f,
         ["Modules depend on the cut and the universe: they are a summary of correlation "
          "structure, not discrete biological units. The tree path in modules.csv shows which "

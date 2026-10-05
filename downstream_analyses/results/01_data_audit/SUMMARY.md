@@ -1,6 +1,6 @@
 # Data audit: what the exports can support
 
-_Generated 2026-10-05 06:04 UTC by `downstream_analyses/01_data_audit.py` from `csv_exports/`._
+_Generated 2026-10-05 06:36 UTC by `downstream_analyses/01_data_audit.py` from `csv_exports/`._
 
 ## Question
 
