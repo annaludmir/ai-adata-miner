@@ -12,7 +12,10 @@ Method
   A. Pseudobulk counts per cell class x phase (09, from this version on) ->
      log2 TMM-CPM within each class across its phases; classes with >= 50
      cells in each of G1, S and G2M. Per gene: log2 S / G2M, and log2 cycling
-     (mean of G1, S, G2M) / Non-cycling. Gene calls need |log2 ratio| >= 0.5
+     (mean of G1, S, G2M) / non-cycling. The two files label non-cycling cells
+     differently -- cortex 'Non-cycling' (its 'Post-M' is a small separate
+     group), human_dev 'Post-M' (it has almost no 'Non-cycling' cells) -- so
+     each dataset's non-cycling label is the phase holding most of its neurons. Gene calls need |log2 ratio| >= 0.5
      with the same sign in both chemistries. Lists / seed panels: mean log2
      ratio vs random sets matched on expression decile; v2 x v3 combined,
      tiered. Agreement with 09's cluster-level S-vs-G2/M lean.
@@ -47,8 +50,18 @@ MIN_CPM = 5.0
 LFC = 0.5
 N_RANDOM = 2000
 PROGENITORS = ["Radial glia", "Neuronal IPC", "Glioblast"]
-PHASES_B = ["G1", "S", "G2M", "Non-cycling"]
+CYCLING = ["G1", "S", "G2M"]
+NONCYCLING = "non-cycling"     # the dataset's own label is mapped to this
 MAX_LISTED = 8
+
+
+def noncycling_label(n: str) -> str:
+    """The phase label that holds most neurons in this stratum ('Non-cycling' or 'Post-M')."""
+    gs = C.group_summary(n, "cell_class_x_phase")
+    parts = gs["group"].map(lambda g: C.parse_group(g, 2))
+    gs = gs.assign(cls=parts.str[0], phase=parts.str[1])
+    neu = gs[(gs.cls == "Neuron") & ~gs.phase.isin(CYCLING)]
+    return str(neu.sort_values("n_cells").phase.iloc[-1]) if len(neu) else "Non-cycling"
 
 
 def part_a(out: C.Output, sets_by_ds: dict, rng: np.random.Generator):
@@ -59,6 +72,7 @@ def part_a(out: C.Output, sets_by_ds: dict, rng: np.random.Generator):
             continue
         out.used(f"{n}/09_pseudobulk/cell_class_x_phase__pseudobulk_counts.csv")
         cnt = C.group_matrix(n, "cell_class_x_phase", "pseudobulk_counts", min_cells=MIN_PHASE_CELLS)
+        nc = noncycling_label(n)
         by_class: dict[str, dict[str, str]] = {}
         for col in cnt.columns:
             cls, ph = C.parse_group(col, 2)
@@ -71,8 +85,9 @@ def part_a(out: C.Output, sets_by_ds: dict, rng: np.random.Generator):
             lc = lc.loc[lc.mean(axis=1) >= np.log2(MIN_CPM + 1)]
             d = pd.DataFrame({"gene": lc.index, "mean_log2cpm": lc.mean(axis=1).to_numpy(),
                               "lfc_s_vs_g2m": (lc["S"] - lc["G2M"]).to_numpy()})
-            if "Non-cycling" in lc:
-                d["lfc_cycling_vs_noncycling"] = (lc[["G1", "S", "G2M"]].mean(axis=1) - lc["Non-cycling"]).to_numpy()
+            if nc in lc:
+                d["lfc_cycling_vs_noncycling"] = (lc[CYCLING].mean(axis=1) - lc[nc]).to_numpy()
+            d["noncycling_label"] = nc
             d.insert(0, "cell_class", cls)
             d.insert(0, "chemistry", chem)
             d.insert(0, "dataset", ds)
@@ -138,6 +153,7 @@ def part_b(out: C.Output, sets_by_ds: dict, rng: np.random.Generator) -> pd.Data
             continue
         out.used(f"{n}/09_pseudobulk/cell_class_x_phase_x_age__pseudobulk_counts.csv")
         cnt = C.group_matrix(n, "cell_class_x_phase_x_age", "pseudobulk_counts", min_cells=MIN_AGE_CELLS)
+        nc = noncycling_label(n)
         parts = {}
         for col in cnt.columns:
             cls, ph, age = C.parse_group(col, 3)
@@ -145,7 +161,9 @@ def part_b(out: C.Output, sets_by_ds: dict, rng: np.random.Generator) -> pd.Data
                 a = float(age)
             except ValueError:
                 continue
-            if cls in PROGENITORS and ph in PHASES_B and not C.excluded(ds, age=a):
+            if ph == nc:
+                ph = NONCYCLING
+            if cls in PROGENITORS and ph in CYCLING + [NONCYCLING] and not C.excluded(ds, age=a):
                 parts.setdefault((cls, ph), []).append((a, col))
         for (cls, ph), items in sorted(parts.items()):
             if len(items) < MIN_AGES:
@@ -250,7 +268,10 @@ def main() -> None:
          f"Within-phase age trends: class x phase x age pseudobulks, >= {MIN_AGES} ages of >= {MIN_AGE_CELLS} cells; "
          "mean rho of list genes vs matched null; combined and tiered."],
         f,
-        ["Phase calls come from cell-cycle marker expression, so phase-panel genes are partly circular "
+        ["The files' phase annotations differ: human_dev calls non-cycling cells 'Post-M' (its neurons are "
+         "~98% Post-M), cortex 'Non-cycling'; each dataset's non-cycling label is taken from where its "
+         "neurons sit.",
+         "Phase calls come from cell-cycle marker expression, so phase-panel genes are partly circular "
          "(they define the phases); the informative part is every other gene.",
          "Pseudobulks pool donors; per-chemistry replication is the safeguard."],
         ["Per-donor phase pseudobulks for a donor-level test."])

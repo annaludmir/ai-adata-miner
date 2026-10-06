@@ -107,7 +107,10 @@ exclusion rules, `exclusions_strict.csv` and `AIM_STRICT=true` (B8; analysis 28)
 labels for different cells, so "cluster 12" in v2 is not cluster 12 in v3;
 `leiden_scVI`, `louvain` and human_dev's `cluster_id` are shared
 (`_common.cluster_label_identity`). Males are few (2–4 all-male age points per
-chemistry), which limits any sex analysis.
+chemistry), which limits any sex analysis. The two files' cell-cycle labels
+differ: human_dev calls non-cycling cells "Post-M" (its neurons are ~98% Post-M
+and it has almost no "Non-cycling"), while cortex uses "Non-cycling" and keeps
+"Post-M" for a small separate group; "cycling" = G1 + S + G2M works for both.
 
 These all run off `csv_exports/`. Discover inputs via `csv_exports/<dataset>/_manifest.csv`.
 

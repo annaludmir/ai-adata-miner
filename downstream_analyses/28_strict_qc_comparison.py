@@ -10,10 +10,14 @@ and do effect sizes agree?
 Method
   For each key table, the standard results (this run) are joined with the
   strict-QC results (AIM_STRICT_RESULTS) on the table's keys. Reported: tiered
-  results in each run, kept in both, lost and gained under strict QC; among
-  results tiered in the standard run, the share with the same sign under strict
-  QC; and the Spearman correlation of the combined statistic (Stouffer Z, or
-  the summed per-chemistry effects) over all shared rows.
+  results in each run, kept in both, gained under strict QC, and those lost --
+  split into 'not tested' (the row is absent from the strict run, usually
+  because removing cells left too few age points or cells in a group) and
+  'tested, lost tier'; among standard-tiered results tested in both runs, the
+  share with the same sign; the Spearman correlation of the combined statistic
+  (Stouffer Z, or the summed per-chemistry effects) over shared rows; and,
+  where the table records them, the mean number of age points per row in each
+  run (strict QC removes low-depth cells, and depth varies with age).
 
 Inputs: results/<analysis>/<table>.csv in both result folders. Skipped inside a
 strict run itself, or when no strict results exist.
@@ -85,23 +89,37 @@ def main() -> None:
             continue
         s, t = s.assign(_stat=stat(s), tier=s.get("tier", pd.Series("", index=s.index)).fillna("")), \
             t.assign(_stat=stat(t), tier=t.get("tier", pd.Series("", index=t.index)).fillna(""))
-        m = s[keys + ["_stat", "tier"]].merge(t[keys + ["_stat", "tier"]], on=keys, how="outer",
-                                               suffixes=("_standard", "_strict"))
+        age_cols = [c for c in ("n_ages_v2", "n_ages_v3") if c in s.columns and c in t.columns]
+        s["_n_ages"] = s[age_cols].sum(axis=1) if age_cols else np.nan
+        t["_n_ages"] = t[age_cols].sum(axis=1) if age_cols else np.nan
+        s["_present"], t["_present"] = True, True
+        m = s[keys + ["_stat", "tier", "_n_ages", "_present"]].merge(
+            t[keys + ["_stat", "tier", "_n_ages", "_present"]], on=keys, how="outer", suffixes=("_standard", "_strict"))
+        m[["_present_standard", "_present_strict"]] = m[["_present_standard", "_present_strict"]].astype(
+            "boolean").fillna(False).astype(bool)
         m[["tier_standard", "tier_strict"]] = m[["tier_standard", "tier_strict"]].fillna("")
         ts, tt = m.tier_standard != "", m.tier_strict != ""
         both = m.dropna(subset=["_stat_standard", "_stat_strict"])
-        same = (np.sign(m.loc[ts, "_stat_standard"]) == np.sign(m.loc[ts, "_stat_strict"]))
+        tested = m._present_strict & m._stat_strict.notna()
+        sel = ts & tested
+        same = (np.sign(m.loc[sel, "_stat_standard"]) == np.sign(m.loc[sel, "_stat_strict"]))
         rows.append({"table": label, "n_rows_shared": len(both), "tiered_standard": int(ts.sum()),
                      "tiered_strict": int(tt.sum()), "tiered_both": int((ts & tt).sum()),
-                     "lost_under_strict": int((ts & ~tt).sum()), "gained_under_strict": int((~ts & tt).sum()),
-                     "same_sign_among_standard_tiered": float(same.mean()) if len(same) else np.nan,
+                     "lost_not_tested_under_strict": int((ts & ~tested).sum()),
+                     "lost_tested_under_strict": int((ts & tested & ~tt).sum()),
+                     "gained_under_strict": int((~ts & tt).sum()),
+                     "same_sign_among_standard_tiered_tested": float(same.mean()) if len(same) else np.nan,
                      "spearman_stat": float(both._stat_standard.corr(both._stat_strict, method="spearman"))
-                     if len(both) > 10 else np.nan})
+                     if len(both) > 10 else np.nan,
+                     "mean_age_points_standard": float(m.loc[m._present_standard, "_n_ages_standard"].mean()),
+                     "mean_age_points_strict": float(m.loc[m._present_strict, "_n_ages_strict"].mean())})
         lost = m[ts & ~tt].copy()
+        lost["tested_under_strict"] = tested[ts & ~tt]
         if len(lost):
             lost.insert(0, "table", label)
             lost["key"] = lost[keys].astype(str).agg(" | ".join, axis=1)
-            lost_rows.append(lost[["table", "key", "_stat_standard", "_stat_strict", "tier_standard"]])
+            lost_rows.append(lost[["table", "key", "_stat_standard", "_stat_strict", "tier_standard",
+                                   "tested_under_strict"]])
     res = pd.DataFrame(rows)
     lost = pd.concat(lost_rows, ignore_index=True) if lost_rows else pd.DataFrame()
     out.write(res, "strict_qc_agreement", "Per table: tiered results in each run, kept / lost / gained, sign "
@@ -111,10 +129,13 @@ def main() -> None:
     if res.empty:
         f.append("**No comparable tables found** in both result folders.")
     for r in res.itertuples():
+        ages = (f"; age points per row {r.mean_age_points_standard:.1f} -> {r.mean_age_points_strict:.1f}"
+                if np.isfinite(r.mean_age_points_standard) else "")
         f.append(f"**{r.table}**: {r.tiered_standard} tiered (standard) vs {r.tiered_strict} (strict); kept "
-                 f"{r.tiered_both}, lost {r.lost_under_strict}, gained {r.gained_under_strict}; same sign "
-                 f"{r.same_sign_among_standard_tiered:.0%} of standard-tiered; Spearman of statistic "
-                 f"{r.spearman_stat:+.2f}.")
+                 f"{r.tiered_both}; lost {r.lost_not_tested_under_strict} not tested under strict QC + "
+                 f"{r.lost_tested_under_strict} tested but below the tier; gained {r.gained_under_strict}; "
+                 f"same sign in {r.same_sign_among_standard_tiered_tested:.0%} of standard-tiered results tested in "
+                 f"both; Spearman of statistic {r.spearman_stat:+.2f}{ages}.")
     if len(lost):
         f.append("**Examples lost under strict QC**: " + "; ".join(
             f"{t}: " + ", ".join(g.key.head(MAX_LISTED)) for t, g in lost.groupby("table", sort=False)) + ".")
@@ -127,6 +148,9 @@ def main() -> None:
         f,
         ["Strict QC removes cells, so it also lowers power: a lost result can be a weaker test, not a QC "
          "artefact; check whether its statistic kept its sign.",
+         "The gene-count threshold removes low-depth cells, and depth varies with age (it falls with age in "
+         "cortex), so strict QC thins some age points more than others; groups then fall below minimum "
+         "cell counts and whole rows go untested.",
          "Thresholds are set from the exported QC quantiles; they are a robustness probe, not a recommendation."],
         ["Re-derive thresholds per cell class (neurons and progenitors differ in genes per cell)."])
 
