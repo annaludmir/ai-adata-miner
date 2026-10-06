@@ -86,6 +86,19 @@ collapsing whenever a result could be inflated by co-regulated neighbours.
 10. **Small groups are flagged, not dropped.** Respect `below_min_cells` and
    `n_cells` columns; a group of 7 cells should not drive a conclusion.
 11. **Gene panels are seed lists**, not authoritative releases (`panels/README.md`).
+12. **Check that a cluster label means the same cells in both chemistries.**
+   cortex's `Clusters`, `ClustersModularity` and `ClustersSurprise` were computed
+   per chemistry and reuse labels; `leiden_scVI`, `louvain` and human_dev's
+   `cluster_id` are shared. Test with `_common.cluster_label_identity` before
+   combining a per-cluster result across v2 and v3.
+13. **The null must vary what the question varies.** Random genes answer "is
+   this list special among genes"; they do not answer "is this split of donors
+   special" (sex, any donor attribute) -- for that, shuffle the attribute among
+   donors (see 14). Run a random gene list through a new test to check it is
+   calibrated.
+14. **Shared helpers for the per-stratum -> v2 x v3 pattern**: `null_effect`,
+   `combine_chemistries`, `matched_draws` / `matched_sets`, `level_bins`,
+   `partial_spearman`, `gene_length`, `top_markers` in `_common.py`.
 
 ## Output contract
 

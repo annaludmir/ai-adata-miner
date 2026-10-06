@@ -596,7 +596,7 @@ def set_mean_rows(Z: np.ndarray, sets: np.ndarray) -> np.ndarray:
 def set_class_preference(n: str, ds: str, chem: str, sets: dict[str, list[str]],
                          rng: np.random.Generator, n_random: int = 5000,
                          n_bins: int = 10, min_genes: int = 5, min_age_points: int = 3,
-                         label: str = "panel") -> pd.DataFrame:
+                         label: str = "panel", match_extra: pd.Series | None = None) -> pd.DataFrame:
     """Does each gene set score higher in one cell class than in the others?
 
     Pseudobulk counts per (cell class, age point) -> log2 TMM-CPM; genes >= 5
@@ -604,7 +604,9 @@ def set_class_preference(n: str, ds: str, chem: str, sets: dict[str, list[str]],
     column is the mean Z of its genes. For class c, at every age point, the
     difference between c and the mean of the other classes is taken, and T is
     its mean over age points (age points are donors). The null is T for random
-    sets drawing one gene from each member's expression decile.
+    sets drawing one gene from each member's expression decile (and, with
+    match_extra -- a per-gene category indexed by symbol, e.g. a length
+    tertile -- from the same category too).
     """
     cnt = group_matrix(n, "cell_class_x_age", "pseudobulk_counts")
     lc = tmm_log_cpm(cnt)
@@ -617,7 +619,10 @@ def set_class_preference(n: str, ds: str, chem: str, sets: dict[str, list[str]],
 
     level = lc.mean(axis=1).to_numpy()
     bins = np.digitize(level, np.quantile(level, np.linspace(0, 1, n_bins + 1)[1:-1]))
-    members_of_bin = [np.nonzero(bins == b)[0] for b in range(n_bins)]
+    if match_extra is not None:
+        codes = pd.factorize(pd.Series(match_extra).reindex(lc.index), use_na_sentinel=True)[0]
+        bins = bins * (codes.max() + 2) + (codes + 1)
+    members_of_bin = {b: np.nonzero(bins == b)[0] for b in np.unique(bins)}
 
     classes = sorted(set(cls_of))
     layout = {}
@@ -1027,3 +1032,135 @@ def coherence_from_sums(sums: np.ndarray, k: int) -> np.ndarray:
 
 def fmt_p(p: float) -> str:
     return "NA" if not np.isfinite(p) else (f"{p:.2g}" if p >= 1e-3 else f"{p:.1e}")
+
+
+# ---------------------------------------------------------------------------
+# per-stratum test -> v2 x v3 combination (shared by 11-20)
+# ---------------------------------------------------------------------------
+def level_bins(level, n_bins: int = 10) -> np.ndarray:
+    """Quantile bin (0 .. n_bins-1) of each gene's expression level."""
+    level = np.asarray(level, dtype=float)
+    return np.digitize(level, np.quantile(level, np.linspace(0, 1, n_bins + 1)[1:-1]))
+
+
+def bin_pools(bins: np.ndarray) -> dict[int, np.ndarray]:
+    return {int(b): np.nonzero(bins == b)[0] for b in np.unique(bins)}
+
+
+def matched_draws(bins: np.ndarray, idx: np.ndarray, n_sets: int,
+                  rng: np.random.Generator) -> np.ndarray:
+    """(n_sets x len(idx)) random genes, each from its member's bin (with replacement)."""
+    pools = bin_pools(bins)
+    return np.stack([rng.choice(pools[int(bins[i])], size=n_sets) for i in idx], axis=1)
+
+
+def null_effect(obs: float, null) -> tuple[float, float, float, float]:
+    """(effect in null SDs, two-sided empirical p, null mean, null SD)."""
+    null = np.asarray(null, dtype=float)
+    null = null[np.isfinite(null)]
+    if not np.isfinite(obs) or null.size < 2:
+        return np.nan, np.nan, np.nan, np.nan
+    mu, sd = float(null.mean()), float(null.std())
+    p = (np.sum(np.abs(null - mu) >= abs(obs - mu) - 1e-12) + 1) / (null.size + 1)
+    return ((obs - mu) / sd if sd > 0 else np.nan), float(p), mu, sd
+
+
+def combine_chemistries(per: pd.DataFrame, keys: list[str], effect: str = "effect_vs_null_sd",
+                        p: str = "perm_p", weight: str | None = None,
+                        labels: tuple[str, str] = ("higher", "lower"),
+                        carry: tuple[str, ...] = ()) -> pd.DataFrame:
+    """v2 x v3 per key: signed Stouffer, BH per dataset (if a key), tier, direction.
+
+    per holds one row per key x chemistry with an effect (signed) and a
+    two-sided p; weight names a column whose square root weights each
+    chemistry (e.g. the number of age points). Columns in carry are kept
+    as <col>_v2 / <col>_v3.
+    """
+    rows = []
+    for k, g in per.groupby(keys, sort=False):
+        g = g.drop_duplicates("chemistry").set_index("chemistry")
+        if not set(CHEMISTRIES) <= set(g.index):
+            continue
+        a, b = g.loc["v2"], g.loc["v3"]
+        w = [np.sqrt(float(a[weight])), np.sqrt(float(b[weight]))] if weight else [1.0, 1.0]
+        Z, pc = signed_stouffer([np.array([a[effect]], float), np.array([b[effect]], float)],
+                                [np.array([a[p]], float), np.array([b[p]], float)], w)
+        row = dict(zip(keys, k if isinstance(k, tuple) else (k,)))
+        for col in carry:
+            row[f"{col}_v2"], row[f"{col}_v3"] = a[col], b[col]
+        row.update({"effect_v2": a[effect], "p_v2": a[p], "effect_v3": b[effect], "p_v3": b[p],
+                    "stouffer_z": float(Z[0]), "combined_p": float(pc[0])})
+        rows.append(row)
+    comb = pd.DataFrame(rows)
+    if comb.empty:
+        return comb
+    comb["combined_q"] = np.nan
+    groups = comb.groupby("dataset").groups.items() if "dataset" in keys else [(None, comb.index)]
+    for _, ix in groups:
+        comb.loc[ix, "combined_q"] = bh(comb.loc[ix, "combined_p"])
+    comb["tier"] = replication_tier(comb.effect_v2, comb.p_v2, comb.effect_v3, comb.p_v3,
+                                    comb.combined_q)
+    comb["direction"] = np.where(comb.stouffer_z > 0, labels[0], labels[1])
+    return comb.sort_values("combined_p", kind="stable").reset_index(drop=True)
+
+
+def partial_spearman(X: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
+    """Spearman of each row of X with y, controlling for z (ranks residualised on z)."""
+    R = rank_rows(np.asarray(X, dtype=float))
+    ry, rz = stats.rankdata(y), stats.rankdata(z)
+    R = R - R.mean(axis=1, keepdims=True)
+    ry, rz = ry - ry.mean(), rz - rz.mean()
+    zz = float(dot(rz, rz))
+    Rres = R - np.outer(dot(R, rz) / zz, rz)
+    yres = ry - (float(dot(ry, rz)) / zz) * rz
+    den = np.linalg.norm(Rres, axis=1) * np.linalg.norm(yres)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(den > 0, dot(Rres, yres) / den, np.nan)
+
+
+def gene_length(dataset: str) -> pd.Series:
+    """Genomic span (End - Start, bp) per symbol, from the cross-dataset map."""
+    g = csv("_cross_dataset", "gene_id_map.csv", low_memory=False)
+    g = g[g["dataset"] == dataset].drop_duplicates("symbol")
+    span = pd.to_numeric(g["End"], errors="coerce") - pd.to_numeric(g["Start"], errors="coerce")
+    return pd.Series(span.to_numpy(), index=g["symbol"].astype(str).to_numpy()).where(lambda s: s > 0)
+
+
+def top_markers(namespace: str, grouping: str, n: int = 5) -> dict[str, str]:
+    """{group: 'GENE1, GENE2, ...'} from 10_markers (empty if the table is absent)."""
+    p = EXPORTS / namespace / "10_markers" / f"top_markers_{grouping}.csv"
+    if not p.exists():
+        return {}
+    t = pd.read_csv(p)
+    t["top_group"] = t["top_group"].astype(str)
+    t = t.sort_values(["top_group", "rank_in_group"])
+    return {g: ", ".join(h["gene"].astype(str).head(n)) for g, h in t.groupby("top_group")}
+
+
+# Some clusterings were computed per chemistry, reusing labels for different
+# cells (cortex Clusters / ClustersModularity / ClustersSurprise); others were
+# computed once (cortex leiden_scVI / louvain, human_dev cluster_id). Only the
+# latter allow "the same cluster" to be compared between v2 and v3.
+SHARED_LABEL_IDENTITY = 0.7
+
+
+def cluster_label_identity(dataset: str, clustering: str, min_cells: int = COEXPR_MIN_CELLS,
+                           n_genes: int = 2000) -> tuple[float, int]:
+    """(share of labels whose v2 profile best matches the same label in v3, labels compared).
+
+    Profiles: log2 TMM-CPM of clusters with >= min_cells in both chemistries,
+    each gene centred over those clusters, the n_genes most variable genes,
+    Pearson between clusters.
+    """
+    mats = [tmm_log_cpm(group_matrix(ns(dataset, c), f"cluster_{clustering}", "pseudobulk_counts",
+                                     min_cells=min_cells)) for c in CHEMISTRIES]
+    a, b = mats
+    shared = a.columns.intersection(b.columns)
+    if len(shared) < 3:
+        return 0.0, len(shared)
+    genes = a.index.intersection(b.index)
+    za, zb = a.loc[genes, shared], b.loc[genes, shared]
+    za, zb = za.sub(za.mean(axis=1), axis=0), zb.sub(zb.mean(axis=1), axis=0)
+    top = (za.std(axis=1) + zb.std(axis=1)).nlargest(n_genes).index
+    R = corr_rows(za.loc[top].T.to_numpy(float), zb.loc[top].T.to_numpy(float))
+    return float((R.argmax(axis=1) == np.arange(len(shared))).mean()), len(shared)

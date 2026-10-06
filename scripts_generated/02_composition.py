@@ -38,7 +38,9 @@ from lib.stats_utils import (chi2_standardised_residuals, cramers_v,
 SCRIPT = "02_composition"
 SUBDIR = "02_composition"
 GROUPING_ROLES = ["age", "region", "subregion", "dissection", "donor", "sample",
-                  "chemistry", "dev_stage", "age_chem"]
+                  "chemistry", "dev_stage", "age_chem",
+                  # other cell-type annotations, for step 3's annotation-agreement audit
+                  "alt_cell_class", "cell_type_id"]
 LABEL_ROLES = ["cell_class", "cyclephase"]
 MAX_GROUP_LEVELS = 1000
 

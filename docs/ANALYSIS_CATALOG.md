@@ -83,7 +83,22 @@ programs, covering proliferation and G1/S/G2M shares over development, a gene
 phase map, gene-set phase profiles, and list age trends with proliferation
 genes set aside (09); splicing dynamics from script 12's spliced/unspliced
 pseudobulks, covering where genes and lists are being switched on or off along
-the lineage, and unspliced-share age trends joined with expression trends (10).
+the lineage, and unspliced-share age trends joined with expression trends (10);
+lists at sub-type resolution, by fine cluster and along neuron sub-type axes
+(11); sub-type abundance over age within classes (12); regional differences
+within cell types (13); sex differences, exploratory (14); between-donor
+variability against matched genes (15); a cross-donor-set age clock (16);
+human_dev's latent factors (17); co-expression rewiring between early and late
+clusters (18); robustness to gene length, QC metrics and dissociation stress
+(19); agreement of CellClass with the files' other annotations (20, needs stage
+1 from this version for its cross-tabulations).
+
+**Data facts found along the way**: cortex's fine clusterings (`Clusters`,
+`ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse
+labels for different cells, so "cluster 12" in v2 is not cluster 12 in v3;
+`leiden_scVI`, `louvain` and human_dev's `cluster_id` are shared
+(`_common.cluster_label_identity`). Males are few (2–4 all-male age points per
+chemistry), which limits any sex analysis.
 
 These all run off `csv_exports/`. Discover inputs via `csv_exports/<dataset>/_manifest.csv`.
 

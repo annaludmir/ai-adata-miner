@@ -311,20 +311,6 @@ def cluster_covariates(n: str, cols: list[str]) -> pd.DataFrame:
     return cov
 
 
-def partial_spearman(X: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
-    """Spearman of each row of X with y, controlling for z (ranks residualised on z)."""
-    R = C.rank_rows(X)
-    ry, rz = C.stats.rankdata(y), C.stats.rankdata(z)
-    R = R - R.mean(axis=1, keepdims=True)
-    ry, rz = ry - ry.mean(), rz - rz.mean()
-    zz = float(C.dot(rz, rz))
-    Rres = R - np.outer(C.dot(R, rz) / zz, rz)
-    yres = ry - (float(C.dot(ry, rz)) / zz) * rz
-    den = np.linalg.norm(Rres, axis=1) * np.linalg.norm(yres)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        return np.where(den > 0, C.dot(Rres, yres) / den, np.nan)
-
-
 def phase_map(out: C.Output) -> tuple[pd.DataFrame, dict]:
     per, mats = [], {}
     for ds, chem in C.STRATA:
@@ -344,7 +330,7 @@ def phase_map(out: C.Output) -> tuple[pd.DataFrame, dict]:
                           "mean_log2cpm": X.mean(axis=1)})
         if "s_share" in cov and cov["s_share"].notna().sum() >= 20:
             m = cov["s_share"].notna().to_numpy()
-            d["rho_s_vs_g2m"] = partial_spearman(X[:, m], cov["s_share"].to_numpy(float)[m],
+            d["rho_s_vs_g2m"] = C.partial_spearman(X[:, m], cov["s_share"].to_numpy(float)[m],
                                                  cov["cycling"].to_numpy(float)[m])
             d["n_cycling_clusters"] = int(m.sum())
         per.append(d)

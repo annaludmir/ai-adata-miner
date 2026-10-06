@@ -69,6 +69,9 @@ DATASETS: dict[str, dict] = {
 COLUMN_ROLES: dict[str, list[str]] = {
     "cell_class":   ["CellClass", "classes", "cell_type", "CellType"],
     "cell_type_id": ["cell_type_ontology_term_id"],
+    # an older or coarser cell-type label kept alongside cell_class (cortex 'classes');
+    # 02_composition cross-tabulates it against cell_class for the annotation audit
+    "alt_cell_class": ["classes"],
     "age":          ["Age", "age"],
     "age_text":     ["Agetext", "Subset"],
     "region":       ["Region", "Tissue"],
