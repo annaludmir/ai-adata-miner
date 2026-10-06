@@ -1,6 +1,6 @@
 # Latent factors (human_dev): identity, gene lists, and age trends within cell types
 
-_Generated 2026-10-06 04:43 UTC by `downstream_analyses/17_latent_factors.py` from `csv_exports/`._
+_Generated 2026-10-06 08:12 UTC by `downstream_analyses/17_latent_factors.py` from `csv_exports/`._
 
 ## Question
 
@@ -53,6 +53,6 @@ Which cell types and regions does each latent factor mark, which gene lists conc
 ## Output files
 
 - `factor_identity.csv` -- Per factor: class whose pseudobulk expresses its top positive genes most; top major class by mean activity; top region; v2/v3 agreement; QC flags from 08
-- `lists_in_factors.csv` -- Per set x factor pole: overlap with the factor's 100 top genes vs the expression-matched expectation; exact Poisson-binomial p; BH over all tests
 - `factor_age_trends_per_stratum.csv` -- Per stratum x factor: donor mean activity vs age, raw and composition-adjusted (exact permutation p)
 - `factor_age_trends_combined.csv` -- v2 x v3 combined factor age trends; tier
+- `lists_in_factors.csv` -- Per set x factor pole: overlap with the factor's 100 top genes vs the expression-matched expectation; exact Poisson-binomial p; BH over all tests; factor_likely_technical from 08's QC correlations

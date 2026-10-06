@@ -213,8 +213,6 @@ def main() -> None:
     out.write(ident, "factor_identity", "Per factor: class whose pseudobulk expresses its top positive "
               "genes most; top major class by mean activity; top region; v2/v3 agreement; QC flags from 08")
     lif = lists_in_factors(out, poles)
-    out.write(lif, "lists_in_factors", "Per set x factor pole: overlap with the factor's 100 top genes vs "
-              "the expression-matched expectation; exact Poisson-binomial p; BH over all tests")
     per, comb = age_trends(out)
     out.write(per, "factor_age_trends_per_stratum", "Per stratum x factor: donor mean activity vs age, "
               "raw and composition-adjusted (exact permutation p)")
@@ -238,14 +236,23 @@ def main() -> None:
              f"and {int((ident.tracks_cell_cycle_v2 | ident.tracks_cell_cycle_v3).sum())} as tracking the cell "
              "cycle by 08. Class where each factor's top genes peak (v2): " + ", ".join(
                  f"{c} {g.factor.size}" for c, g in ident.groupby("genes_top_cell_class_v2")) + ".")
-    hits = lif[(lif.q < 0.05) & (lif.overlap >= MIN_OVERLAP)]
+    technical = set(ident.factor[ident.likely_technical_v2.astype(bool) | ident.likely_technical_v3.astype(bool)])
+    lif["factor_likely_technical"] = lif.factor.isin(technical)
+    out.write(lif, "lists_in_factors", "Per set x factor pole: overlap with the factor's 100 top genes vs "
+              "the expression-matched expectation; exact Poisson-binomial p; BH over all tests; "
+              "factor_likely_technical from 08's QC correlations")
+    all_hits = lif[(lif.q < 0.05) & (lif.overlap >= MIN_OVERLAP)]
+    hits = all_hits[~all_hits.factor_likely_technical]
     if len(hits):
         parts = []
         for name, g in hits.groupby("gene_set", sort=False):
             parts.append(f"{name}: " + ", ".join(f"{describe(r.factor)}{r.pole} ({r.overlap} genes, "
                                                   f"{r.fold:.1f}x)" for r in g.head(3).itertuples()))
         f.append("**Gene sets concentrated among a factor's top genes** (q < 0.05, >= "
-                 f"{MIN_OVERLAP} genes; + / - = positive / negative pole): " + " | ".join(parts[:MAX_LISTED * 2]) + ".")
+                 f"{MIN_OVERLAP} genes; + / - = positive / negative pole; factors 08 flags as likely "
+                 "technical left out): " + " | ".join(parts[:MAX_LISTED * 2]) + "."
+                 + (f" Left out: {len(all_hits) - len(hits)} hits in technical factors "
+                    f"({', '.join(f'F{k}' for k in sorted(technical))})." if len(all_hits) > len(hits) else ""))
     else:
         f.append("**No gene set concentrates among any factor's top genes** beyond expression-matched chance.")
     for kind in ("raw", "composition-adjusted"):

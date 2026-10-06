@@ -13,6 +13,10 @@ Method
   score minus the mean of the class's other regions. Null: random sets drawing
   each member from its expression decile (2,000 sets). v2 and v3 are
   combined per class x region (signed Stouffer, BH, tiered).
+  Findings are reported for neural classes (radial glia, IPCs, neuroblasts,
+  neurons, glioblasts, oligodendrocyte lineage); non-neural classes are
+  summarised separately, since ambient neural RNA makes neural gene sets look
+  regional there.
   Age check: each region's cell-weighted mean age per stratum (05_confounds
   crosstab), reported as the region's age offset from the class's other
   regions next to every finding; and, per set, the Spearman between region
@@ -43,6 +47,11 @@ MIN_GENES = 5
 MIN_REGIONS = 3
 MIN_CPM = 5.0
 MAX_LISTED = 8
+# Non-neural classes (blood, immune, vascular, fibroblast, ...) pick up free-floating
+# neural RNA released during dissociation, so neural gene sets look "higher" in the
+# regions with most neural tissue. Their region results are kept in the tables but
+# reported separately as likely ambient RNA.
+NEURAL_CLASSES = {"Radial glia", "Neuronal IPC", "Neuroblast", "Neuron", "Glioblast", "Oligo"}
 
 
 def region_ages(n: str) -> pd.Series:
@@ -120,8 +129,11 @@ def main() -> None:
     comb = C.combine_chemistries(per, ["dataset", "cell_class", "region", "gene_set"],
                                  labels=("higher", "lower"),
                                  carry=("difference_vs_other_regions", "age_offset_weeks", "n_genes"))
+    if not comb.empty:
+        comb["neural_class"] = comb.cell_class.isin(NEURAL_CLASSES)
     out.write(comb, "region_contrast_combined",
-              "Per class x region x set: v2 x v3 combined; tier; region age offset per chemistry")
+              "Per class x region x set: v2 x v3 combined; tier; region age offset per chemistry; "
+              "neural_class = False marks classes where ambient neural RNA is likely")
     ac = age_check(per)
     out.write(ac, "region_effect_vs_age",
               "Per set x stratum: Spearman between region effects and region age offsets (a strong "
@@ -130,11 +142,13 @@ def main() -> None:
 
     # ---- findings -----------------------------------------------------------
     f = []
-    rep = comb[comb.tier != ""] if not comb.empty else comb
+    all_rep = comb[comb.tier != ""] if not comb.empty else comb
+    rep = all_rep[all_rep.neural_class] if len(all_rep) else all_rep
     classes = per.cell_class.nunique()
     f.append(f"**Tested**: {classes} cell classes with >= {MIN_REGIONS} regions, "
              f"{per.gene_set.nunique()} gene sets, {len(comb)} class x region x set tests in both "
-             f"chemistries; {len(rep)} tiered ({(rep.tier == 'replicated').sum()} replicated).")
+             f"chemistries; {len(all_rep)} tiered ({(all_rep.tier == 'replicated').sum()} replicated), "
+             f"{len(rep)} of them in neural classes ({', '.join(sorted(NEURAL_CLASSES & set(per.cell_class)))}).")
     for kind, label in (("list:", "Gene lists"), ("seed:", "Seed NDD panels"), ("module:", "Modules")):
         r = rep[rep.gene_set.str.startswith(kind)] if len(rep) else rep
         if r.empty:
@@ -147,10 +161,18 @@ def main() -> None:
             parts.append(f"{name} ({len(g)} tiered): " + ", ".join(
                 f"{x.direction} in {x.cell_class} of {x.region} ({x.effect_v2:+.1f}/{x.effect_v3:+.1f}; "
                 f"age {x.age_offset_weeks_v2:+.1f}/{x.age_offset_weeks_v3:+.1f} wk)" for x in g.head(3).itertuples()))
-        f.append(f"**{label} that differ between regions within a class** (strongest three per set; "
+        f.append(f"**{label} that differ between regions within a neural class** (strongest three per set; "
                  "effect in null SDs v2/v3; region age offset vs the class's other regions): "
                  + " | ".join(parts[:MAX_LISTED * 2])
                  + ("" if len(parts) <= MAX_LISTED * 2 else f" | (+{len(parts) - MAX_LISTED * 2} more sets)") + ".")
+    amb = all_rep[~all_rep.neural_class & all_rep.gene_set.str.startswith(("list:", "seed:"))] \
+        if len(all_rep) else all_rep
+    if len(amb):
+        f.append("**Non-neural classes, likely ambient RNA** (not interpreted): "
+                 + ", ".join(f"{c} {len(g)}" for c, g in amb.groupby("cell_class"))
+                 + f" tiered list / panel results ({(amb.direction == 'higher').mean():.0%} 'higher'); neural "
+                 "gene sets in these cells mostly measure ambient neural RNA, so they are listed in "
+                 "region_contrast_combined.csv (neural_class = False) but not interpreted.")
     if not ac.empty:
         w = ac.pivot(index="gene_set", columns="chemistry", values="spearman_effect_vs_age_offset").dropna()
         strong = w[(w.abs() >= 0.5).all(axis=1) & (np.sign(w["v2"]) == np.sign(w["v3"]))]
@@ -171,7 +193,10 @@ def main() -> None:
          "v2 x v3 signed Stouffer, BH, tiered. Region age offsets from 05_confounds "
          "(cell-weighted mean age of the region in the stratum)."],
         f,
-        ["Each class x region pseudobulk pools several donors of varying ages; regions were "
+        ["Non-neural cells carry ambient neural RNA from dissociation, so their region "
+         "differences for neural gene sets track how much neural tissue the region had; they are "
+         "reported separately and not interpreted.",
+         "Each class x region pseudobulk pools several donors of varying ages; regions were "
          "sampled at different ages, so a region difference can be partly age (see the offsets "
          "and the age check).",
          "Region labels are dissection labels; 'Forebrain' overlaps Telencephalon and Diencephalon.",
