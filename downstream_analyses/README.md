@@ -51,9 +51,20 @@ PYTHON=~/aim-env/bin/python ./downstream_analyses/run_all.sh
 | 18 | Co-expression rewiring: list coherence in early vs late clusters, same class mix | cluster profile | `rewiring_combined.csv` |
 | 19 | Robustness: gene-length-matched nulls for 06/07 tests; modules tracking QC metrics; dissociation-stress score vs age | as the tests checked | `length_check_summary.csv`, `module_qc.csv`, `stress_vs_age.csv` |
 | 20 | Agreement of CellClass with the files' other annotations (cortex 'classes', human_dev Cell Ontology terms); needs stage 1 from this version | cells | `annotation_agreement.csv`, `annotation_mapping.csv` |
+| 21 | Age trends inside one brain region (human_dev): which survive removing the region mix, and does the telencephalon agree better with cortex? | age point (≈ donor) | `gene_age_trends_combined.csv`, `comparison_with_03.csv` |
+| 22 | Expression measured directly in G1 / S / G2M cells: S vs G2/M and cycling vs non-cycling genes and lists; agreement with 09; list age trends within one phase | class x phase pseudobulk; age point | `gene_phase_calls.csv`, `set_phase_ratios_combined.csv` |
+| 23 | Per-cell list scores: is a list active in all cells of a class or a subset, and does the active share change with age or phase? | cells, against matched random lists | `activity_by_class.csv`, `active_share_vs_age_combined.csv` |
+| 24 | Within-cell co-expression: do a list's genes co-vary from cell to cell inside a class (depth partialled; null calibrated on random programmes)? | cells; v2 x v3 | `within_cell_coherence_combined.csv`, `within_cell_hubs.csv` |
+| 25 | Lists along differentiation pseudotime (RG -> IPC -> neuroblast -> neuron): switch points, and age effects at matched differentiation | pseudotime bin; age point | `set_pseudotime_trends_combined.csv`, `set_age_at_matched_pseudotime_combined.csv` |
+| 26 | Milo neighbourhood abundance over age within classes (cortex) | donor | `nhood_age_trends_combined.csv` |
+| 27 | Cell states over age: tRG among vRG and the vRG G2/M rise; deep/upper and excitatory/inhibitory neurons; OPC vs astrocyte precursors | age point (≈ donor) | `trg_trends_combined.csv`, `state_trends_combined.csv` |
+| 28 | Robustness to stricter cell QC: which tiered results survive (needs an `AIM_STRICT=true` run) | as the tables compared | `strict_qc_agreement.csv` |
 
-Order matters: 02 and 14 read the sex calls from 01; 04, 06, 09, 10 and 19
-read the trends from 03; and 09, 10, 13, 15, 18 and 19 also use 08's modules.
+Order matters: 02 and 14 read the sex calls from 01; 04, 06, 09, 10, 19 and 21
+read the trends from 03; 09, 10, 13, 15, 18 and 19 use 08's modules; 22, 24 and
+25 compare with 06, 07 and 09. Analyses 21-27 need part-B exports (stage-1
+scripts 20-21, stage-2 scripts 09/19/22 from this version on) and say so in
+their summary when those are missing.
 
 06 and 07 need gene lists. They read the folder named by `config.GENE_LISTS_DIR`:
 `AIM_GENE_LISTS` if set, otherwise the cluster folder when it exists, otherwise

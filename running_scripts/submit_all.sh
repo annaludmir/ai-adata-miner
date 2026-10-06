@@ -42,6 +42,7 @@ pass_env() {
   local kv="ALL"
   for v in AIM_ROOT AIM_ENV AI_ADATA_DATA_ROOT AI_ADATA_OUT_ROOT \
            CHUNK_SIZE TOP_GENES LIMIT_CELLS AIM_EXCLUSIONS AIM_DOWNSTREAM_OUT AIM_GENE_LISTS AIM_COLLAPSE_LISTS \
+           AIM_STRICT AIM_STRICT_RESULTS \
            EMAIL_OUTPUT; do
     [[ -n "${!v:-}" ]] && kv="${kv},${v}=${!v}"
   done

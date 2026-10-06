@@ -46,6 +46,8 @@ aim_run 05_covariate_confounds
 aim_run 06_embeddings
 aim_run 07_factor_modules
 aim_run 08_factor_activity
+aim_run 20_lineage_pseudotime
+aim_run 21_milo_nhoods
 aim_run 09_pseudobulk --top-genes "$TOP_GENES"
 aim_run 10_marker_specificity
 aim_run 11_gene_panels
@@ -57,5 +59,6 @@ aim_run 16_expression_patterns
 aim_run 17_gsea_panels
 aim_run 18_chemistry_comparability
 aim_run 19_rg_subtypes
+aim_run 22_cell_level_programs
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1

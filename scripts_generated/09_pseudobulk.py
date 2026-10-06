@@ -18,6 +18,13 @@ different question and the wrong one quietly misleads:
 Genes are capped (default 12k, ranked by total UMIs) to keep CSVs tractable;
 every gene in any panel is force-included regardless of rank.
 
+Groupings added for step 3's part B (counts and group summary only, since
+they are wide and step 3 normalises counts itself):
+  cell_class_x_region_x_age  age trends inside one region (human_dev)
+  cell_class_x_phase(_x_age) expression measured directly in G1 / S / G2M cells
+  pseudotime_bin(_x_age)     expression along the neurogenic lineage (needs
+                             script 20's cell_pseudotime.csv for this stratum)
+
 Outputs (csv_exports/<dataset>/09_pseudobulk/)
   <grouping>__pseudobulk_counts.csv     genes x groups, summed raw counts
   <grouping>__mean_lognorm.csv          genes x groups, mean log1p(CP10K)
@@ -48,6 +55,8 @@ from lib.panels import all_panel_genes
 
 SCRIPT = "09_pseudobulk"
 SUBDIR = "09_pseudobulk"
+# Wide groupings: only pseudobulk_counts + group_summary are written.
+COUNTS_ONLY = {"cell_class_x_region_x_age", "cell_class_x_phase_x_age", "pseudotime_bin_x_age"}
 
 
 def build_groupings(obs: pd.DataFrame) -> dict[str, pd.Series]:
@@ -62,6 +71,14 @@ def build_groupings(obs: pd.DataFrame) -> dict[str, pd.Series]:
         reg = resolve_role(obs, "region")
         if reg is not None and obs[reg].nunique() > 1:
             out["cell_class_x_region"] = combine_keys(obs, [cls, reg])
+            if "age_pcw" in obs.columns:
+                out["cell_class_x_region_x_age"] = combine_keys(
+                    obs.assign(_a=obs["age_pcw"].astype(str)), [cls, reg, "_a"])
+        if "cyclephase_h" in obs.columns and obs["cyclephase_h"].notna().any():
+            out["cell_class_x_phase"] = combine_keys(obs, [cls, "cyclephase_h"])
+            if "age_pcw" in obs.columns:
+                out["cell_class_x_phase_x_age"] = combine_keys(
+                    obs.assign(_a=obs["age_pcw"].astype(str)), [cls, "cyclephase_h", "_a"])
     for role in ("sample", "donor", "region", "subregion"):
         col = resolve_role(obs, role)
         if col is not None and obs[col].nunique(dropna=True) > 1:
@@ -70,6 +87,25 @@ def build_groupings(obs: pd.DataFrame) -> dict[str, pd.Series]:
         out["age"] = obs["age_pcw"].astype(str)
     for col in resolve_cluster_columns(obs):
         out[f"cluster_{col}"] = obs[col].astype("object")
+    return out
+
+
+def pseudotime_groupings(ns: str, obs: pd.DataFrame) -> dict[str, pd.Series]:
+    """Pseudotime bin (and bin x age) per cell, from script 20, aligned to obs rows."""
+    p = config.CSV_EXPORTS / ns / "20_pseudotime" / "cell_pseudotime.csv"
+    if not p.exists():
+        log("  no 20_pseudotime/cell_pseudotime.csv for this stratum -- pseudotime groupings skipped "
+            "(run script 20 in stage 1 first)")
+        return {}
+    pt = pd.read_csv(p)
+    pt = pt[pt["obs_row"] < len(obs)]
+    lab = pd.Series(pd.NA, index=obs.index, dtype="object")
+    lab.iloc[pt["obs_row"].to_numpy()] = [f"pt{int(b):02d}" for b in pt["bin"]]
+    out = {"pseudotime_bin": lab}
+    if "age_pcw" in obs.columns:
+        age = obs["age_pcw"].astype(str)
+        out["pseudotime_bin_x_age"] = (lab + " | " + age).where(lab.notna())
+    log(f"  pseudotime bins for {lab.notna().sum():,} lineage cells")
     return out
 
 
@@ -172,6 +208,7 @@ def run(key: str, args, chem: str | None = None,
               subdir=SUBDIR)
 
     groupings = build_groupings(obs)
+    groupings.update(pseudotime_groupings(ns, obs))
     log(f"  groupings: {', '.join(groupings)}")
 
     aggs, codes_map, names_map, skipped = {}, {}, {}, []
@@ -224,16 +261,8 @@ def run(key: str, args, chem: str | None = None,
                   f"{name}__pseudobulk_counts",
                   f"Summed raw counts per gene per {name} -- input for edgeR/DESeq2",
                   subdir=SUBDIR)
-        man.write(agg.mean_lognorm(levels, kept_symbols).reset_index(),
-                  f"{name}__mean_lognorm",
-                  f"Mean log1p(CP10K) per gene per {name} -- depth-comparable",
-                  subdir=SUBDIR)
-        man.write(agg.detection_fraction(levels, kept_symbols).reset_index(),
-                  f"{name}__detection_fraction",
-                  f"Fraction of cells in each {name} expressing each gene",
-                  subdir=SUBDIR)
-        man.write(agg.cpm(levels, kept_symbols).reset_index(), f"{name}__cpm",
-                  f"Pseudobulk CPM per gene per {name}", subdir=SUBDIR)
+        if name not in COUNTS_ONLY:
+            write_views(man, agg, name, levels, kept_symbols)
         gs = agg.group_summary(levels)
         gs["below_min_cells"] = gs["n_cells"] < config.MIN_CELLS_PER_GROUP
         gs.insert(0, "grouping", name)
@@ -246,6 +275,20 @@ def run(key: str, args, chem: str | None = None,
                   "Groupings that exceeded the width cap and were not exported",
                   subdir=SUBDIR)
     man.flush()
+
+
+def write_views(man, agg, name, levels, kept_symbols) -> None:
+    """The normalised views of a grouping (not written for COUNTS_ONLY groupings)."""
+    man.write(agg.mean_lognorm(levels, kept_symbols).reset_index(),
+              f"{name}__mean_lognorm",
+              f"Mean log1p(CP10K) per gene per {name} -- depth-comparable",
+              subdir=SUBDIR)
+    man.write(agg.detection_fraction(levels, kept_symbols).reset_index(),
+              f"{name}__detection_fraction",
+              f"Fraction of cells in each {name} expressing each gene",
+              subdir=SUBDIR)
+    man.write(agg.cpm(levels, kept_symbols).reset_index(), f"{name}__cpm",
+              f"Pseudobulk CPM per gene per {name}", subdir=SUBDIR)
 
 
 def main() -> None:

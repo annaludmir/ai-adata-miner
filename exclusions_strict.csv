@@ -1,0 +1,7 @@
+dataset,role,value,reason
+human_dev,age,5.0,"The 'without_week_5' file still holds cells at 5.0 pcw (donor XDD:348; 62,786 cells)"
+human_dev,age,5.5,"The 'without_week_5' file still holds cells at 5.5 pcw (donor XDD:400; 59,667 cells)"
+*,frac_mito,>0.02,"Strict QC (B8): mitochondrial fraction above ~ the 95th percentile of either file (0.0206 / 0.0207)"
+*,n_genes,<1100,"Strict QC (B8): fewer genes than ~ the 5th percentile (human_dev 1107, cortex 1205)"
+*,frac_unspliced,>0.37,"Strict QC (B8): unspliced fraction above ~ the 95th percentile (0.369 / 0.373)"
+cortex,doublet_score,>0.17,"Strict QC (B8): DoubletFinder score above the 95th percentile (cortex only; human_dev has no doublet score)"

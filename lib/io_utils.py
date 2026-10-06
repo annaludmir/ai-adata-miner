@@ -177,6 +177,14 @@ def resolve_role(obs: pd.DataFrame, role: str) -> str | None:
     return None
 
 
+def resolve_qc_column(obs: pd.DataFrame, role: str) -> str | None:
+    """First obs column for a QC metric role (config.QC_NUMERIC_ROLES), or None."""
+    for cand in config.QC_NUMERIC_ROLES.get(role, []):
+        if cand in obs.columns:
+            return cand
+    return None
+
+
 def resolve_cluster_columns(obs: pd.DataFrame) -> list[str]:
     """Every clustering column present -- alternative partitions are all profiled."""
     return [c for c in config.CLUSTER_ROLES if c in obs.columns]
@@ -268,22 +276,35 @@ def exclusion_mask(obs: pd.DataFrame, dataset_key: str,
     """(keep, report): which cells survive the exclusion rules, and what each removed.
 
     A rule's role is a semantic role from config.COLUMN_ROLES (age, donor,
-    sample, region, ...) or a raw obs column name. Ages match numerically
-    (to 0.01 pcw, so '5' matches the categorical string '5.0'); donors match
-    after normalising cortex-style IDs; everything else matches as a string.
+    sample, region, ...), a QC metric from config.QC_NUMERIC_ROLES (frac_mito,
+    n_genes, doublet_score, ...) or a raw obs column name. Ages match
+    numerically (to 0.01 pcw, so '5' matches the categorical string '5.0');
+    donors match after normalising cortex-style IDs; a value written as a
+    comparison ('>0.02', '<1100', '>=', '<=') removes cells whose numeric value
+    satisfies it (cells with no value are kept); everything else matches as a
+    string.
     `within` (e.g. the chemistry mask) restricts the counts in the report and
     the log to the cells actually being analysed.
     """
+    import re
     rules = load_exclusions(dataset_key)
     keep = np.ones(len(obs), dtype=bool)
     scope = np.ones(len(obs), dtype=bool) if within is None else np.asarray(within, bool)
     report = []
     for r in rules.itertuples():
-        col = resolve_role(obs, r.role) or (r.role if r.role in obs.columns else None)
+        col = (resolve_role(obs, r.role) or resolve_qc_column(obs, r.role)
+               or (r.role if r.role in obs.columns else None))
+        cmp = re.match(r"^\s*(<=|>=|<|>)\s*([-+0-9.eE]+)\s*$", str(r.value))
         if col is None:
             log(f"  WARNING: exclusion rule {r.role}={r.value} -- no such column in "
                 f"{dataset_key}; rule ignored")
             hit = np.zeros(len(obs), dtype=bool)
+        elif cmp:
+            v = coerce_numeric(obs[col]).to_numpy()
+            thr = float(cmp.group(2))
+            with np.errstate(invalid="ignore"):
+                hit = {"<": v < thr, "<=": v <= thr, ">": v > thr, ">=": v >= thr}[cmp.group(1)]
+            hit = np.where(np.isnan(v), False, hit)
         elif r.role == "age":
             age = coerce_numeric(obs[col]).to_numpy()
             hit = np.abs(age - float(r.value)) < 0.01

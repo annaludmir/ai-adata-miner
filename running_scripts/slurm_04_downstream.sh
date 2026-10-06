@@ -34,6 +34,8 @@ source "${AIM_ROOT}/running_scripts/_common.sh"
 trap aim_report EXIT
 
 export AIM_DOWNSTREAM_OUT="${AIM_DOWNSTREAM_OUT:-/miridan-data/annaludmir/aim_downstream/results}"
+# Analysis 28 compares these results with a strict-QC run (AIM_STRICT=true) when one exists.
+export AIM_STRICT_RESULTS="${AIM_STRICT_RESULTS:-/miridan-data/annaludmir/aim_downstream_strict/results}"
 mkdir -p "$AIM_DOWNSTREAM_OUT"
 
 module load mamba/mamba-1.5.8

@@ -12,3 +12,6 @@ downstream_analyses/results/**/*.csv
 .DS_Store
 # Local copy of the user gene lists (config.GENE_LISTS_DIR); data, not code.
 gene_lists/
+
+# strict-QC re-run (AIM_STRICT=true) exports
+csv_exports_strict/

@@ -14,8 +14,10 @@
 # Stage 2 of 3 -- the only stage that reads the count matrix.
 #
 # Script 09 streams X once and fills every grouping's accumulator in that single
-# pass; script 12 does the same over the spliced/unspliced layers (cortex only,
-# human_dev has no layers and skips cleanly).
+# pass (including the pseudotime bins from stage 1's script 20); script 12 does
+# the same over the spliced/unspliced layers (cortex only, human_dev has no
+# layers and skips cleanly); 19 and 22 each make one more pass (22 adds ~1-2 GB
+# of co-expression accumulators).
 #
 # Memory: a 50k-cell chunk of human_dev is roughly 2-3 GB sparse, and the pass
 # holds about three copies of it (raw, CP10K-normalised, binarised) plus the
@@ -49,5 +51,6 @@ echo "top genes  : ${TOP_GENES}"
 aim_run 09_pseudobulk --top-genes "$TOP_GENES"
 aim_run 12_splicing_layers     # needs spliced/unspliced layers -- cortex only
 aim_run 19_rg_subtypes         # oRG vs vRG per radial-glia cell; reads 09's gene selection
+aim_run 22_cell_level_programs # per-cell programme scores + within-cell co-expression; reads 09's gene totals
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1

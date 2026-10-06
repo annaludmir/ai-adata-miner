@@ -15,6 +15,12 @@ PDGFD; old and new symbols both tried). The difference oRG - vRG calls the
 cell oRG (> +MARGIN), vRG (< -MARGIN) or ambiguous. Because any margin is a
 choice, threshold-free tables by score quintile are exported too.
 
+Truncated radial glia (tRG; apical, derived from vRG, CRYAB-high; reported
+from mid-gestation) are flagged separately and do not change the oRG / vRG
+calls: a non-oRG cell with CRYAB at or above TRG_MIN log1p(CP10K) is
+'tRG-like'. The flag lets step 3 ask whether a change in vRG reflects tRG
+appearing among them.
+
 Streams X once (stage 2). Needs 09's gene selection for the pseudobulk part;
 without it, that part is skipped.
 
@@ -25,6 +31,9 @@ Outputs (csv_exports/<dataset>__<chem>/19_rg_subtypes/)
   rg_phase_by_subtype_x_age.csv          phase composition per sub-type x age (if phases)
   rg_phase_by_subtype_x_age_x_depth.csv  ... within UMI quintiles (radial-glia-wide)
   rg_phase_by_score_bin_x_age.csv        phase composition per oRG-vRG score quintile x age
+  rg_trg_by_age.csv                      per age: tRG-like cells among radial glia and among vRG
+  rg_phase_by_state_x_age.csv            phase composition per state (oRG / vRG / vRG tRG-like /
+                                         ambiguous) x age
   rg_subtype_x_age__{pseudobulk_counts,group_summary}.csv   pseudobulk per sub-type x age
 """
 from __future__ import annotations
@@ -48,6 +57,8 @@ SUBDIR = "19_rg_subtypes"
 RG_LABEL = "Radial glia"
 ORG_MARKERS = ["HOPX", "PTPRZ1", "FAM107A", "TNC", "MOXD1", "LIFR"]
 VRG_MARKERS = ["FBXO32", "CTGF", "CCN2", "CYR61", "CCN1", "PALLD", "PDGFD"]
+TRG_MARKERS = ["CRYAB"]
+TRG_MIN = 1.5         # log1p(CP10K); about one CRYAB UMI in a cell of <= 4,500 UMIs
 MARGIN = 0.2          # log1p(CP10K) units between the two programme scores
 N_BINS = 5            # quintiles of the score difference / of UMIs per cell
 SUBTYPES = ["oRG", "vRG", "ambiguous"]
@@ -92,6 +103,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     sym = genes["symbol"].astype(str).to_numpy()
     o_idx = [i for i, s in enumerate(sym) if s in ORG_MARKERS]
     v_idx = [i for i, s in enumerate(sym) if s in VRG_MARKERS]
+    t_idx = [i for i, s in enumerate(sym) if s in TRG_MARKERS]
     log(f"  oRG markers found: {', '.join(sym[o_idx])} | vRG markers found: {', '.join(sym[v_idx])}")
     if len(o_idx) < 2 or len(v_idx) < 2:
         log("  fewer than two markers for a programme; skipping")
@@ -114,7 +126,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     agg = (GroupAggregator(len(levels), int(gene_mask.sum()), config.TARGET_SUM)
            if gene_mask is not None and ages else None)
 
-    rows_o, rows_v, rows_u, rows_i = [], [], [], []
+    rows_o, rows_v, rows_u, rows_i, rows_t = [], [], [], [], []
     with XReader(path) as xr:
         for start, stop, chunk in xr.iter_chunks(args.chunk_size):
             if start >= n_cells:
@@ -133,6 +145,10 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
             v = np.log1p(np.asarray(sub[:, v_idx].todense() if hasattr(sub, "todense") else sub[:, v_idx])
                          * scale[:, None]).mean(axis=1)
             o, v = np.asarray(o).ravel(), np.asarray(v).ravel()
+            if t_idx:
+                tr = np.log1p(np.asarray(sub[:, t_idx].todense() if hasattr(sub, "todense") else sub[:, t_idx])
+                              * scale[:, None]).mean(axis=1)
+                rows_t.append(np.asarray(tr).ravel())
             idx = np.nonzero(m)[0] + start
             rows_o.append(o)
             rows_v.append(v)
@@ -153,6 +169,9 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     cells["total_umis_x"] = np.concatenate(rows_u)
     cells["subtype"] = np.where(cells.score_diff > MARGIN, "oRG",
                                 np.where(cells.score_diff < -MARGIN, "vRG", "ambiguous"))
+    cells["trg_score"] = np.concatenate(rows_t) if rows_t else np.nan
+    cells["trg_like"] = (cells["trg_score"] >= TRG_MIN) & (cells["subtype"] != "oRG")
+    cells["rg_state"] = np.where(cells.trg_like, cells.subtype + " tRG-like", cells.subtype)
     cells["score_bin"] = pd.qcut(cells.score_diff.rank(method="first"), N_BINS, labels=False)
     cells["depth_bin"] = pd.qcut(cells.total_umis_x.rank(method="first"), N_BINS, labels=False)
     log("  called: " + ", ".join(f"{s} {int((cells.subtype == s).sum()):,}" for s in SUBTYPES))
@@ -186,6 +205,21 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     composition("age_pcw", "age")
     composition(resolve_role(obs, "donor"), "donor")
 
+    if t_idx and "age_pcw" in cells:
+        g = cells.groupby("age_pcw")
+        trg = pd.DataFrame({"n_rg": g.size(), "n_trg_like": g["trg_like"].sum(),
+                            "n_vrg": g["subtype"].apply(lambda s: int((s == "vRG").sum())),
+                            "n_vrg_trg_like": g.apply(lambda d: int((d.trg_like & (d.subtype == "vRG")).sum()),
+                                                      include_groups=False),
+                            "mean_trg_score": g["trg_score"].mean(), "median_umis": g["total_umis_x"].median()})
+        trg["frac_trg_like"] = trg.n_trg_like / trg.n_rg
+        trg["frac_trg_like_among_vrg"] = trg.n_vrg_trg_like / trg.n_vrg.replace(0, np.nan)
+        man.write(trg.reset_index().rename(columns={"age_pcw": "age"}), "rg_trg_by_age",
+                  f"tRG-like radial glia ({'|'.join(sym[t_idx])} >= {TRG_MIN} log1p CP10K, not oRG) per age",
+                  subdir=SUBDIR)
+    else:
+        log("  no tRG marker found -- tRG flag skipped")
+
     phase_col = "cyclephase_h" if "cyclephase_h" in cells else None
     if phase_col is not None and "age_pcw" in cells:
         man.write(phase_table(cells, ["subtype", "age_pcw"], phase_col).rename(columns={"age_pcw": "age"}),
@@ -195,6 +229,10 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
                   .rename(columns={"age_pcw": "age"}), "rg_phase_by_subtype_x_age_x_depth",
                   "Phase composition per sub-type x age x UMI quintile (quintiles over all "
                   "radial glia of the stratum)", subdir=SUBDIR)
+        if t_idx:
+            man.write(phase_table(cells, ["rg_state", "age_pcw"], phase_col).rename(columns={"age_pcw": "age"}),
+                      "rg_phase_by_state_x_age", "Phase composition per radial-glia state (oRG / vRG / "
+                      "vRG tRG-like / ambiguous) x age", subdir=SUBDIR)
         man.write(phase_table(cells, ["score_bin", "age_pcw"], phase_col).rename(columns={"age_pcw": "age"}),
                   "rg_phase_by_score_bin_x_age",
                   "Phase composition per quintile of the oRG - vRG score x age (threshold-free; "

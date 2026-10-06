@@ -93,6 +93,15 @@ clusters (18); robustness to gene length, QC metrics and dissociation stress
 (19); agreement of CellClass with the files' other annotations (20, needs stage
 1 from this version for its cross-tabulations).
 
+**Part B (new extraction passes) -- built**: class x region x age and class x
+phase (x age) pseudobulks in 09 (B1, B2; analyses 21, 22); per-cell programme
+scores and within-cell co-expression in stage-2 script 22 (B3, B4; analyses 23,
+24); lineage pseudotime from the stored latent space in stage-1 script 20 and
+pseudotime pseudobulks in 09 (B5; analysis 25); Milo neighbourhood x donor
+counts in stage-1 script 21 (B6; analysis 26); a tRG flag in 19 and neuron /
+glial state scores in 22 (B7; analysis 27); numeric QC thresholds in the
+exclusion rules, `exclusions_strict.csv` and `AIM_STRICT=true` (B8; analysis 28).
+
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse
 labels for different cells, so "cluster 12" in v2 is not cluster 12 in v3;

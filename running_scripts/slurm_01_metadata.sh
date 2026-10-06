@@ -12,7 +12,7 @@
 
 # Stage 1 of 3 -- everything that never touches the count matrix.
 #
-# Scripts 00-08 and 13 read only .obs / .var / .obsm / .varm, so they finish in
+# Scripts 00-08, 13, 18, 20 and 21 read only .obs / .var / .obsm / .varm, so they finish in
 # minutes even on the 1.67M-cell file and need nowhere near the memory stage 2
 # does. Running them first means the inventory, the confound report and the
 # factor modules are on disk before the expensive streaming starts -- and if the
@@ -48,6 +48,8 @@ aim_run 06_embeddings
 aim_run 07_factor_modules      # needs varm/Loadings -- human_dev only, skips cortex
 aim_run 08_factor_activity
 aim_run 18_chemistry_comparability   # pooled by design: what survives stratification
+aim_run 20_lineage_pseudotime  # per-cell pseudotime from the stored latent space (read by 09)
+aim_run 21_milo_nhoods         # Milo neighbourhood x donor counts -- cortex only, skips human_dev
 
 # 13 compares the two datasets, so it only means anything with both of them.
 if [[ "$DATASET" == "all" ]]; then

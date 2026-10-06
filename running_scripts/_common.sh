@@ -30,6 +30,17 @@ for _v in OMP_NUM_THREADS OPENBLAS_NUM_THREADS MKL_NUM_THREADS NUMEXPR_NUM_THREA
 done
 unset _v
 
+# Strict-QC re-run (B8): AIM_STRICT=true swaps in exclusions_strict.csv (numeric
+# QC thresholds on top of the usual rules) and writes to separate folders, so
+# the standard exports and results stay untouched for comparison (step-3
+# analysis 28 compares the two).
+AIM_STRICT="${AIM_STRICT:-false}"
+if [[ "$AIM_STRICT" == "true" ]]; then
+  export AIM_EXCLUSIONS="${AIM_EXCLUSIONS:-${AIM_ROOT}/exclusions_strict.csv}"
+  export AI_ADATA_OUT_ROOT="${AI_ADATA_OUT_ROOT:-${AIM_ROOT}/csv_exports_strict}"
+  export AIM_DOWNSTREAM_OUT="${AIM_DOWNSTREAM_OUT:-/miridan-data/annaludmir/aim_downstream_strict/results}"
+fi
+
 # Pipeline configuration, read by config.py.
 export AI_ADATA_DATA_ROOT="${AI_ADATA_DATA_ROOT:-/miridan-data/annaludmir/ndd_gene_modules/data}"
 export AI_ADATA_OUT_ROOT="${AI_ADATA_OUT_ROOT:-${AIM_ROOT}/csv_exports}"
@@ -62,6 +73,7 @@ aim_setup() {
   echo "chemistry  : ${CHEMISTRY}"
   echo "threads    : ${OMP_NUM_THREADS} (OMP/OpenBLAS/MKL)"
   echo "exclusions : ${AIM_EXCLUSIONS:-${AIM_ROOT}/exclusions.csv}"
+  [[ "$AIM_STRICT" == "true" ]] && echo "STRICT QC  : on (separate exports and results)"
   echo "gene lists : ${AIM_GENE_LISTS:-/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on (default)}"
   [[ -n "$LIMIT_CELLS" ]] && echo "LIMIT_CELLS: ${LIMIT_CELLS}  (SMOKE TEST -- results are partial)"
   echo "started    : $(date '+%F %T')"

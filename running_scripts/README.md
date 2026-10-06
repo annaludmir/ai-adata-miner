@@ -44,12 +44,12 @@ warnings worth acting on (schema mismatches, confounds, skipped groupings).
 That submits a four-stage chain:
 
 ```
-stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18
+stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18, 20, 21
    |
-   +--> stage 2  pseudobulk cortex v2    128G  6h  scripts 09,12,19─┐
-   +--> stage 2  pseudobulk cortex v3    128G  6h  scripts 09,12,19─┤ all
-   +--> stage 2  pseudobulk human_dev v2 128G  6h  scripts 09,12,19─┤ concurrent
-   +--> stage 2  pseudobulk human_dev v3 128G  6h  scripts 09,12,19─┘
+   +--> stage 2  pseudobulk cortex v2    128G  6h  scripts 09,12,19,22─┐
+   +--> stage 2  pseudobulk cortex v3    128G  6h  scripts 09,12,19,22─┤ all
+   +--> stage 2  pseudobulk human_dev v2 128G  6h  scripts 09,12,19,22─┤ concurrent
+   +--> stage 2  pseudobulk human_dev v3 128G  6h  scripts 09,12,19,22─┘
    |
    v  (afterok on all four)
 stage 3  derived analyses              16G   3h   scripts 10,11,14-17
@@ -104,6 +104,8 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | `AIM_GENE_LISTS` | `/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on` | folder of gene lists (one per file) analysed in step 3 and always exported by stage 2 |
 | `AIM_COLLAPSE_LISTS` | `GWAS` | regex of list names collapsed to one gene per locus in step 3; `none` disables |
 | `AIM_DOWNSTREAM_OUT` | `/miridan-data/annaludmir/aim_downstream/results` | where stage 4 writes step-3 results |
+| `AIM_STRICT` | `false` | `true` reruns with `exclusions_strict.csv` into `csv_exports_strict/` and `.../aim_downstream_strict/results` |
+| `AIM_STRICT_RESULTS` | `.../aim_downstream_strict/results` | strict-QC results that step-3 analysis 28 compares against |
 | `DOWNSTREAM` | `true` | `false` makes `submit_all.sh` stop after stage 3 |
 | `CHUNK_SIZE` | `50000` | cells per streaming chunk (stage 2) |
 | `TOP_GENES` | `12000` | genes exported in pseudobulk; panel genes always added |

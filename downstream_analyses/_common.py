@@ -1164,3 +1164,47 @@ def cluster_label_identity(dataset: str, clustering: str, min_cells: int = COEXP
     top = (za.std(axis=1) + zb.std(axis=1)).nlargest(n_genes).index
     R = corr_rows(za.loc[top].T.to_numpy(float), zb.loc[top].T.to_numpy(float))
     return float((R.argmax(axis=1) == np.arange(len(shared))).mean()), len(shared)
+
+
+# ---------------------------------------------------------------------------
+# shared by the part-B analyses (21-28)
+# ---------------------------------------------------------------------------
+def gene_age_trends(lc: pd.DataFrame, ages) -> pd.DataFrame:
+    """Per gene: Spearman with age and its permutation p (exact for few points)."""
+    ages = np.asarray(ages, dtype=float)
+    rho = spearman_rows(lc.to_numpy(float), ages)
+    p, _ = spearman_perm_p(rho, ages)
+    return pd.DataFrame({"gene": lc.index.to_numpy(), "rho": rho, "perm_p": p,
+                         "mean_log2cpm": lc.mean(axis=1).to_numpy()})
+
+
+def set_shift_test(values: pd.Series, level: pd.Series, sets: dict[str, list[str]],
+                   rng: np.random.Generator, n_random: int = 2000, min_genes: int = 5,
+                   n_bins: int = 10) -> pd.DataFrame:
+    """Mean of a per-gene statistic over each set, vs random sets matched on expression decile.
+
+    values and level are indexed by gene; genes with a missing value are left out.
+    Returns gene_set, n_genes, mean, null_mean, null_sd, effect_vs_null_sd, perm_p.
+    """
+    ok = values.notna() & level.reindex(values.index).notna()
+    v = values[ok].to_numpy(float)
+    genes = values.index[ok]
+    bins = level_bins(level.reindex(genes).to_numpy(float), n_bins)
+    pos = {g: i for i, g in enumerate(genes)}
+    rows = []
+    for name, members in sets.items():
+        idx = np.array(sorted({pos[g] for g in members if g in pos}))
+        if idx.size < min_genes:
+            continue
+        obs = float(v[idx].mean())
+        null = set_mean_rows(v[:, None], matched_draws(bins, idx, n_random, rng))[:, 0]
+        eff, p, mu, sd = null_effect(obs, null)
+        rows.append({"gene_set": name, "n_genes": int(idx.size), "mean": obs, "null_mean": mu,
+                     "null_sd": sd, "effect_vs_null_sd": eff, "perm_p": p})
+    return pd.DataFrame(rows)
+
+
+def parse_group(label: str, n: int) -> list[str]:
+    """'Radial glia | Telencephalon | 8.0' -> ['Radial glia', 'Telencephalon', '8.0'] (n parts)."""
+    parts = [x.strip() for x in str(label).split("|")]
+    return parts if len(parts) == n else [str(label)] + [""] * (n - 1)

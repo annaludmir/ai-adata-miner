@@ -42,9 +42,15 @@ dataset,role,value,reason
 human_dev,age,5.0,"The 'without_week_5' file still holds cells at 5.0 pcw (donor XDD:348; 62,786 cells)"
 ```
 
-`role` is a semantic role (`age`, `donor`, `sample`, `region`, ...) or a raw
-`.obs` column; `dataset` may be `*`. Ages match numerically, and donors match
-across the two files' ID styles. Every extraction step applies the rules, and
+`role` is a semantic role (`age`, `donor`, `sample`, `region`, ...), a QC
+metric (`frac_mito`, `n_genes`, `total_umis`, `frac_unspliced`,
+`doublet_score`, ...) or a raw `.obs` column; `dataset` may be `*`. Ages match
+numerically, and donors match across the two files' ID styles. A value written
+as a comparison (`>0.02`, `<1100`, `>=`, `<=`) removes cells whose numeric value
+satisfies it. `exclusions_strict.csv` adds such thresholds (each QC metric's
+~5% tail) for a robustness rerun: `AIM_STRICT=true ./submit_all.sh` writes to
+`csv_exports_strict/` and a separate results folder, and step-3 analysis 28
+compares the two. Every extraction step applies the rules, and
 script 01 records what each one removed in `01_overview/exclusions_applied.csv`.
 Step 3 re-applies the age, donor and sample rules to older exports. Use
 `--exclusions other.csv` (or `AIM_EXCLUSIONS=...` on the cluster) to swap the

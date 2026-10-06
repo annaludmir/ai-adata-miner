@@ -121,6 +121,15 @@ VAR_ACCESSION_CANDIDATES = ["Accession", "gene_ids", "ensembl_id"]
 # Embeddings worth summarising, in preference order.
 EMBEDDING_KEYS = ["X_umap", "UMAP", "X_Embedding", "X_scVI", "TSNE", "PCA"]
 
+# Lineage pseudotime (script 20): the latent space each file stores, the
+# dorsal neurogenic lineage in order, and -- for the whole-brain atlas -- the
+# region whose cells form that lineage (other regions have other lineages).
+PSEUDOTIME_EMBEDDING = {"cortex": "X_scVI", "human_dev": "Factors"}
+LINEAGE_CLASSES = ["Radial glia", "Neuronal IPC", "Neuroblast", "Neuron"]
+PSEUDOTIME_REGIONS = {"human_dev": ["Telencephalon"]}
+PSEUDOTIME_PCS = 10            # latent dims are standardised, then reduced to this many PCs
+PSEUDOTIME_BINS = 20           # equal-width bins of pseudotime in [0, 1] for pseudobulks
+
 # Label harmonisation so the two datasets can be compared in step 3.
 LABEL_SYNONYMS: dict[str, dict[str, str]] = {
     "cyclephase": {"PostM": "Post-M", "Post-M": "Post-M", "post-m": "Post-M"},

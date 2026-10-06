@@ -1,6 +1,6 @@
 # Step 3 report: downstream analyses
 
-_Built 2026-10-06 08:12 UTC from 20 analyses over `csv_exports/`._
+_Built 2026-10-06 09:11 UTC from 28 analyses over `csv_exports/`._
 
 Read this first. Three facts about the data constrain every result below
 (details in 01):
@@ -39,6 +39,14 @@ Read this first. Three facts about the data constrain every result below
 - [18. Co-expression rewiring: coherence of gene lists in early vs late clusters](#18-co-expression-rewiring-coherence-of-gene-lists-in-early-vs-late-clusters)
 - [19. Robustness checks: gene length, quality metrics, dissociation stress](#19-robustness-checks-gene-length-quality-metrics-dissociation-stress)
 - [20. Agreement between CellClass and the files' other cell-type annotations](#20-agreement-between-cellclass-and-the-files-other-cell-type-annotations)
+- [21. Age trends within one brain region (human_dev): the region confound removed](#21-age-trends-within-one-brain-region-humandev-the-region-confound-removed)
+- [22. Expression measured in each cell-cycle phase: S vs G2/M, cycling vs not, and age within a phase](#22-expression-measured-in-each-cell-cycle-phase-s-vs-g2m-cycling-vs-not-and-age-within-a-phase)
+- [23. Gene lists at single-cell level: broad or subset activity, by age and phase](#23-gene-lists-at-single-cell-level-broad-or-subset-activity-by-age-and-phase)
+- [24. Within-cell co-expression of gene lists inside cell types](#24-within-cell-co-expression-of-gene-lists-inside-cell-types)
+- [25. Gene lists along differentiation pseudotime, and age at matched differentiation](#25-gene-lists-along-differentiation-pseudotime-and-age-at-matched-differentiation)
+- [26. Neighbourhood (Milo) abundance over age within cell classes (cortex)](#26-neighbourhood-milo-abundance-over-age-within-cell-classes-cortex)
+- [27. Cell states over development: truncated radial glia, neuron sub-types, glial precursors](#27-cell-states-over-development-truncated-radial-glia-neuron-sub-types-glial-precursors)
+- [28. Robustness to stricter cell QC: standard vs strict-QC results](#28-robustness-to-stricter-cell-qc-standard-vs-strict-qc-results)
 
 ## 01. Data audit: what the exports can support
 
@@ -312,4 +320,68 @@ Method, limitations and output files: [results/19_robustness_checks/SUMMARY.md](
 - **Not run**: these tables are written by stage 1 from this version of the repo on (config role alt_cell_class, and cell_type_id added to 02_composition's groupings). Re-run stage 1 (slurm_01_metadata.sh), then this analysis.
 
 Method, limitations and output files: [results/20_annotation_agreement/SUMMARY.md](results/20_annotation_agreement/SUMMARY.md)
+
+## 21. Age trends within one brain region (human_dev): the region confound removed
+
+**Question.** Skipped: no class x region x age pseudobulk yet.
+
+- **Not run**: script 09 writes this grouping from this version of the repo on; re-run stage 2 (slurm_02_pseudobulk.sh), then this analysis.
+
+Method, limitations and output files: [results/21_region_age_trends/SUMMARY.md](results/21_region_age_trends/SUMMARY.md)
+
+## 22. Expression measured in each cell-cycle phase: S vs G2/M, cycling vs not, and age within a phase
+
+**Question.** Skipped: no class x phase pseudobulk yet.
+
+- **Not run**: script 09 writes the phase groupings from this version of the repo on; re-run stage 2 (slurm_02_pseudobulk.sh), then this analysis.
+
+Method, limitations and output files: [results/22_phase_resolved_expression/SUMMARY.md](results/22_phase_resolved_expression/SUMMARY.md)
+
+## 23. Gene lists at single-cell level: broad or subset activity, by age and phase
+
+**Question.** Skipped: no per-cell programme scores yet.
+
+- **Not run**: script 22 is new; re-run stage 2 (slurm_02_pseudobulk.sh), then this analysis.
+
+Method, limitations and output files: [results/23_cell_level_activity/SUMMARY.md](results/23_cell_level_activity/SUMMARY.md)
+
+## 24. Within-cell co-expression of gene lists inside cell types
+
+**Question.** Skipped: no within-cell co-expression yet.
+
+- **Not run**: script 22 is new; re-run stage 2 (slurm_02_pseudobulk.sh), then this analysis.
+
+Method, limitations and output files: [results/24_within_cell_coexpression/SUMMARY.md](results/24_within_cell_coexpression/SUMMARY.md)
+
+## 25. Gene lists along differentiation pseudotime, and age at matched differentiation
+
+**Question.** Skipped: no pseudotime pseudobulks yet.
+
+- **Not run**: scripts 20 and 09's pseudotime groupings are new; re-run stages 1 and 2, then this analysis.
+
+Method, limitations and output files: [results/25_pseudotime_programs/SUMMARY.md](results/25_pseudotime_programs/SUMMARY.md)
+
+## 26. Neighbourhood (Milo) abundance over age within cell classes (cortex)
+
+**Question.** Skipped: no Milo neighbourhood counts.
+
+- **Not run**: script 21 is new; re-run stage 1 (slurm_01_metadata.sh), then this analysis.
+
+Method, limitations and output files: [results/26_milo_abundance/SUMMARY.md](results/26_milo_abundance/SUMMARY.md)
+
+## 27. Cell states over development: truncated radial glia, neuron sub-types, glial precursors
+
+**Question.** Skipped: no tRG flags or state scores yet.
+
+- **Not run**: the tRG flag (script 19) and state scores (script 22) are new; re-run stage 2 (slurm_02_pseudobulk.sh), then this analysis.
+
+Method, limitations and output files: [results/27_cell_states/SUMMARY.md](results/27_cell_states/SUMMARY.md)
+
+## 28. Robustness to stricter cell QC: standard vs strict-QC results
+
+**Question.** Skipped: no strict-QC results at /nonexistent.
+
+- **Not run**: no strict-QC results at /nonexistent. To produce them: `AIM_STRICT=true ./submit_all.sh` (exclusions_strict.csv; exports to csv_exports_strict/, results to aim_downstream_strict/), then rerun stage 4 here.
+
+Method, limitations and output files: [results/28_strict_qc_comparison/SUMMARY.md](results/28_strict_qc_comparison/SUMMARY.md)
 
