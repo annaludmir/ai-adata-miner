@@ -7,7 +7,7 @@
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
@@ -20,7 +20,8 @@
 #
 # Analyses 01-05 take ~20 s on a laptop; the co-expression analyses 06-08 add
 # about a minute and ~1.5 GB (longer with large gene lists). Cluster nodes ran
-# stage 3 several times slower than a laptop, hence 8G / 1 CPU / 1h.
+# stage 3 several times slower than a laptop, hence 8G / 1 CPU. With analyses
+# 01-34 a laptop needs ~5 min; the cluster took ~20 min for 01-28, so 2h.
 #
 #   sbatch slurm_04_downstream.sh
 #   sbatch --dependency=afterok:<stage3_jobid> slurm_04_downstream.sh

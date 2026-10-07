@@ -59,12 +59,20 @@ PYTHON=~/aim-env/bin/python ./downstream_analyses/run_all.sh
 | 26 | Milo neighbourhood abundance over age within classes (cortex) | donor | `nhood_age_trends_combined.csv` |
 | 27 | Cell states over age: tRG among vRG and the vRG G2/M rise; deep/upper and excitatory/inhibitory neurons; OPC vs astrocyte precursors | age point (≈ donor) | `trg_trends_combined.csv`, `state_trends_combined.csv` |
 | 28 | Robustness to stricter cell QC: which tiered results survive (needs an `AIM_STRICT=true` run) | as the tables compared | `strict_qc_agreement.csv` |
+| 29 | What modules, sub-modules, age-trend genes, phase classes and lists do: GO / Reactome / KEGG enrichment against expressed genes | gene groups | `top_terms.csv`, `enrichment.csv` |
+| 30 | Transcription factors: TF content, CollecTRI target enrichment (candidate regulators) and whether each TF tracks its targets across clusters | clusters; v2 x v3 | `regulon_enrichment.csv`, `regulon_activity_combined.csv` |
+| 31 | Mutation intolerance (gnomAD LOEUF) and Mendelian disease genes in lists, sub-modules and modules vs matched genes; LOEUF vs variability, connectivity, age trends | genes | `set_constraint.csv`, `constraint_relations.csv` |
+| 32 | Ligand-receptor signalling potential between cell types over age; NDD genes as ligands / receptors | age point (≈ donor) | `interaction_age_trends_combined.csv`, `ndd_ligands_receptors.csv` |
+| 33 | List entries matched only through HGNC previous symbols / aliases, and why the rest are missing | list entries | `list_matching_routes.csv`, `unmatched_entries.csv` |
+| 34 | External validation: cortex whole-tissue age trends vs BrainSpan neocortex (8-16 pcw) | donor | `agreement.csv`, `set_trends_ours_vs_brainspan.csv` |
 
 Order matters: 02 and 14 read the sex calls from 01; 04, 06, 09, 10, 19 and 21
 read the trends from 03; 09, 10, 13, 15, 18 and 19 use 08's modules; 22, 24 and
 25 compare with 06, 07 and 09. Analyses 21-27 need part-B exports (stage-1
 scripts 20-21, stage-2 scripts 09/19/22 from this version on) and say so in
-their summary when those are missing.
+their summary when those are missing. Analyses 29-34 need the external
+annotation files (`running_scripts/fetch_annotations.sh`, folder `AIM_ANNOTATIONS`)
+and skip without them; 29-31 also read 03, 07, 08, 09 and 15.
 
 06 and 07 need gene lists. They read the folder named by `config.GENE_LISTS_DIR`:
 `AIM_GENE_LISTS` if set, otherwise the cluster folder when it exists, otherwise

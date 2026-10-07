@@ -55,7 +55,7 @@ stage 1  metadata, both datasets       16G   1h   scripts 00-08, 13, 18, 20, 21
 stage 3  derived analyses              16G   3h   scripts 10,11,14-17
    |
    v  (afterok)
-stage 4  step-3 downstream analyses     8G   1h   downstream_analyses/ + REPORT.md
+stage 4  step-3 downstream analyses     8G   2h   downstream_analyses/ + REPORT.md
 ```
 
 Stage 4 writes **outside the repo**, to `AIM_DOWNSTREAM_OUT` (default
@@ -91,6 +91,19 @@ re-reads the matrix.
 | `slurm_full_pipeline.sh` | all 18 steps in one job (simpler; no concurrency) |
 | `_common.sh` | sourced helper: env, per-step runner, summary trap |
 
+## External annotations (step-3 part C)
+
+Analyses 29-34 read GO / Reactome / KEGG gene sets, TF lists and targets, gnomAD
+constraint, HPO disease genes, ligand-receptor pairs, HGNC symbols and BrainSpan.
+Download them once, on the login node (light, ~0.4 GB, about two minutes):
+
+```bash
+./fetch_annotations.sh            # -> /miridan-data/annaludmir/aim_annotations, with MANIFEST.tsv
+```
+
+Without them those analyses say so and skip. Once the HGNC table is there,
+gene-list matching everywhere also uses HGNC previous symbols.
+
 ## Knobs
 
 All read from the environment, all forwarded through the chain by `submit_all.sh`.
@@ -104,6 +117,7 @@ All read from the environment, all forwarded through the chain by `submit_all.sh
 | `AIM_GENE_LISTS` | `/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on` | folder of gene lists (one per file) analysed in step 3 and always exported by stage 2 |
 | `AIM_COLLAPSE_LISTS` | `GWAS` | regex of list names collapsed to one gene per locus in step 3; `none` disables |
 | `AIM_DOWNSTREAM_OUT` | `/miridan-data/annaludmir/aim_downstream/results` | where stage 4 writes step-3 results |
+| `AIM_ANNOTATIONS` | `/miridan-data/annaludmir/aim_annotations` | external annotation files for step-3 analyses 29-34; fill it once with `./fetch_annotations.sh` on the login node |
 | `AIM_STRICT` | `false` | `true` reruns with `exclusions_strict.csv` into `csv_exports_strict/` and `.../aim_downstream_strict/results` |
 | `AIM_STRICT_RESULTS` | `.../aim_downstream_strict/results` | strict-QC results that step-3 analysis 28 compares against |
 | `DOWNSTREAM` | `true` | `false` makes `submit_all.sh` stop after stage 3 |

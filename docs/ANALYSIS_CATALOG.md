@@ -102,6 +102,14 @@ counts in stage-1 script 21 (B6; analysis 26); a tRG flag in 19 and neuron /
 glial state scores in 22 (B7; analysis 27); numeric QC thresholds in the
 exclusion rules, `exclusions_strict.csv` and `AIM_STRICT=true` (B8; analysis 28).
 
+**Part C (external annotations) -- built**: `running_scripts/fetch_annotations.sh`
+downloads GO / Reactome / KEGG (Enrichr), Lambert TFs and CollecTRI targets,
+gnomAD v4.1 constraint, HPO gene-to-disease, OmniPath ligand-receptor pairs,
+HGNC and BrainSpan into `AIM_ANNOTATIONS`. Analyses: functional enrichment
+(29), TF regulators (30), constraint and disease genes (31), cell-cell
+signalling (32), HGNC symbol rescue (33; also used by every list analysis),
+BrainSpan validation (34). OMIM itself is licensed and not fetched.
+
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse
 labels for different cells, so "cluster 12" in v2 is not cluster 12 in v3;

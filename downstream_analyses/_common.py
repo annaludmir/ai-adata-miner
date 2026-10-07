@@ -742,8 +742,10 @@ def map_genes(genes, dataset: str) -> pd.DataFrame:
     """Resolve list entries to this dataset's gene symbols.
 
     In order: exact symbol; case-insensitive; Ensembl id (version stripped);
-    and finally the OTHER file's annotation -- a symbol known there is carried
-    over through the shared Ensembl id. The two files use different symbol
+    the OTHER file's annotation -- a symbol known there is carried over through
+    the shared Ensembl id; and, when the HGNC table has been fetched
+    (fetch_annotations.sh), HGNC previous symbols and unambiguous aliases,
+    through their Ensembl id. The two files use different symbol
     versions (cortex has HIST1H1C where human_dev has H1-2 after the 2020 HGNC
     histone renaming), so this recovers renamed genes without an alias table.
     Returns input, symbol and how it matched ('missing' if not).
@@ -761,6 +763,7 @@ def map_genes(genes, dataset: str) -> pd.DataFrame:
     other = {}
     for sym, acc in zip(o["symbol"].astype(str), o["accession_base"].astype(str)):
         other.setdefault(sym.upper(), acc)
+    hgnc = hgnc_to_ensembl()     # empty until the HGNC table is fetched (part C)
     rows = []
     for x in genes:
         x = str(x).strip()
@@ -772,6 +775,8 @@ def map_genes(genes, dataset: str) -> pd.DataFrame:
             rows.append((x, ensg[x.split(".")[0]], "ensembl"))
         elif x.upper() in other and other[x.upper()] in ensg:
             rows.append((x, ensg[other[x.upper()]], "other_file_symbol"))
+        elif hgnc.get(x.upper(), "") in ensg:
+            rows.append((x, ensg[hgnc[x.upper()]], "hgnc_previous_or_alias"))
         else:
             rows.append((x, "", "missing"))
     return pd.DataFrame(rows, columns=["input", "symbol", "match"])
@@ -1208,3 +1213,147 @@ def parse_group(label: str, n: int) -> list[str]:
     """'Radial glia | Telencephalon | 8.0' -> ['Radial glia', 'Telencephalon', '8.0'] (n parts)."""
     parts = [x.strip() for x in str(label).split("|")]
     return parts if len(parts) == n else [str(label)] + [""] * (n - 1)
+
+
+# ---------------------------------------------------------------------------
+# external annotations (part C, analyses 29-34); fetched by
+# running_scripts/fetch_annotations.sh into config.ANNOTATIONS_DIR
+# ---------------------------------------------------------------------------
+def annotations_dir() -> Path:
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import config
+    return Path(config.ANNOTATIONS_DIR)
+
+
+def annotation(rel: str) -> Path | None:
+    """Path of an annotation file, or None when it has not been fetched."""
+    p = annotations_dir() / rel
+    return p if p.exists() and p.stat().st_size > 0 else None
+
+
+def read_gmt(path: Path) -> dict[str, list[str]]:
+    """GMT: name <tab> description <tab> genes... (Enrichr leaves the description empty)."""
+    out = {}
+    for line in Path(path).read_text().splitlines():
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) >= 3:
+            genes = [g.split(",")[0].strip() for g in parts[2:] if g.strip()]
+            if genes:
+                out[parts[0].strip()] = list(dict.fromkeys(genes))
+    return out
+
+
+_HGNC: dict[str, dict] = {}
+
+
+def hgnc_to_ensembl() -> dict[str, str]:
+    """UPPER-CASE symbol -> Ensembl id, from HGNC: current symbols, then unambiguous
+    previous symbols, then unambiguous aliases (never overriding a current symbol)."""
+    if "map" in _HGNC:
+        return _HGNC["map"]
+    p = annotation("hgnc/hgnc_complete_set.txt")
+    out: dict[str, str] = {}
+    if p is not None:
+        h = pd.read_csv(p, sep="\t", low_memory=False, usecols=["symbol", "prev_symbol", "alias_symbol",
+                                                                 "ensembl_gene_id"])
+        h = h.dropna(subset=["ensembl_gene_id"])
+        for sym, ens in zip(h["symbol"].astype(str), h["ensembl_gene_id"].astype(str)):
+            out[sym.upper()] = ens
+        for col in ("prev_symbol", "alias_symbol"):
+            pairs = [(s.strip().upper(), e) for v, e in zip(h[col], h["ensembl_gene_id"]) if isinstance(v, str)
+                     for s in v.split("|") if s.strip()]
+            counts = pd.Series([s for s, _ in pairs]).value_counts()
+            for s, e in pairs:
+                if counts[s] == 1 and s not in out:
+                    out[s] = e
+    _HGNC["map"] = out
+    return out
+
+
+_SYMBOL_MAP: dict[str, dict[str, str]] = {}
+
+
+def to_dataset_symbols(genes, dataset: str) -> dict[str, str]:
+    """{input symbol: this dataset's symbol} for annotation genes (map_genes, cached)."""
+    cache = _SYMBOL_MAP.setdefault(dataset, {})
+    todo = [g for g in dict.fromkeys(map(str, genes)) if g not in cache]
+    if todo:
+        m = map_genes(todo, dataset)
+        for inp, sym, how in zip(m["input"], m["symbol"], m["match"]):
+            cache[inp] = sym if how != "missing" else ""
+    return {g: cache.get(str(g), "") for g in genes if cache.get(str(g), "")}
+
+
+def gmt_libraries() -> dict[str, dict[str, list[str]]]:
+    """{library: {term: genes}} for every .gmt in <annotations>/gmt/."""
+    d = annotations_dir() / "gmt"
+    return {p.stem: read_gmt(p) for p in sorted(d.glob("*.gmt"))} if d.is_dir() else {}
+
+
+def tf_list() -> set[str]:
+    p = annotation("tf/TF_names_v_1.01.txt")
+    return {x.strip() for x in p.read_text().splitlines() if x.strip()} if p else set()
+
+
+def collectri() -> pd.DataFrame:
+    """TF -> target edges (CollecTRI via OmniPath): tf, target, sign (+1 / -1 / 0)."""
+    p = annotation("tf/collectri.tsv")
+    if p is None:
+        return pd.DataFrame(columns=["tf", "target", "sign"])
+    t = pd.read_csv(p, sep="\t")
+    t = t[~t.source_genesymbol.astype(str).str.contains("COMPLEX|_", regex=True)]
+    sign = np.where(t.consensus_stimulation & ~t.consensus_inhibition, 1,
+                    np.where(t.consensus_inhibition & ~t.consensus_stimulation, -1, 0))
+    return pd.DataFrame({"tf": t.source_genesymbol.astype(str), "target": t.target_genesymbol.astype(str),
+                         "sign": sign}).drop_duplicates(["tf", "target"])
+
+
+def gnomad_constraint() -> pd.DataFrame:
+    """Per gene symbol: loeuf (LoF o/e upper CI), pli, mis_z -- MANE / canonical transcript."""
+    p = annotation("constraint/gnomad.v4.1.constraint_metrics.tsv")
+    if p is None:
+        return pd.DataFrame(columns=["loeuf", "pli", "mis_z"])
+    c = pd.read_csv(p, sep="\t", usecols=["gene", "mane_select", "canonical", "lof.oe_ci.upper", "lof.pLI",
+                                           "mis.z_score"], low_memory=False)
+    c["_rank"] = c["mane_select"].astype(str).eq("true") * 2 + c["canonical"].astype(str).eq("true")
+    c = c.sort_values("_rank", ascending=False).drop_duplicates("gene")
+    out = pd.DataFrame({"loeuf": pd.to_numeric(c["lof.oe_ci.upper"], errors="coerce").to_numpy(),
+                        "pli": pd.to_numeric(c["lof.pLI"], errors="coerce").to_numpy(),
+                        "mis_z": pd.to_numeric(c["mis.z_score"], errors="coerce").to_numpy()},
+                       index=c["gene"].astype(str).to_numpy())
+    return out[out.loeuf.notna()]
+
+
+def disease_genes() -> pd.DataFrame:
+    """HPO gene -> disease (OMIM / ORPHA ids): gene, disease_id, association_type."""
+    p = annotation("disease/genes_to_disease.txt")
+    if p is None:
+        return pd.DataFrame(columns=["gene", "disease_id", "association_type"])
+    h = pd.read_csv(p, sep="\t")
+    return h.rename(columns={"gene_symbol": "gene"})[["gene", "disease_id", "association_type"]]
+
+
+def ligand_receptor_pairs(min_resources: int = 4) -> pd.DataFrame:
+    """Ligand -> receptor pairs: OmniPath interactions whose source is annotated as a ligand
+    (secreted or membrane) and target as a receptor (plasma membrane) by >= min_resources
+    intercell databases each."""
+    pi, pr = annotation("lr/omnipath_interactions.tsv"), annotation("lr/intercell_ligand_receptor.tsv")
+    if pi is None or pr is None:
+        return pd.DataFrame(columns=["ligand", "receptor"])
+    ic = pd.read_csv(pr, sep="\t", low_memory=False)
+    ic = ic[ic.entity_type == "protein"]
+    # receptors must sit in the plasma membrane; ligands must be secreted or on the membrane
+    flags = ic.groupby("genesymbol")[["secreted", "plasma_membrane_transmembrane",
+                                      "plasma_membrane_peripheral"]].any()
+    membrane = set(flags.index[flags.plasma_membrane_transmembrane | flags.plasma_membrane_peripheral])
+    outside = membrane | set(flags.index[flags.secreted])
+    ic = ic[((ic.category == "receptor") & ic.genesymbol.isin(membrane))
+            | ((ic.category == "ligand") & ic.genesymbol.isin(outside))]
+    n = ic.groupby(["category", "genesymbol"]).database.nunique()
+    lig = set(n.loc["ligand"][n.loc["ligand"] >= min_resources].index) if "ligand" in n.index.get_level_values(0) else set()
+    rec = set(n.loc["receptor"][n.loc["receptor"] >= min_resources].index) if "receptor" in n.index.get_level_values(0) else set()
+    it = pd.read_csv(pi, sep="\t")
+    it = it[it.source_genesymbol.isin(lig) & it.target_genesymbol.isin(rec)]
+    return (pd.DataFrame({"ligand": it.source_genesymbol.astype(str), "receptor": it.target_genesymbol.astype(str)})
+            .drop_duplicates().reset_index(drop=True))

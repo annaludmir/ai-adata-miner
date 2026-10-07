@@ -75,6 +75,7 @@ aim_setup() {
   echo "exclusions : ${AIM_EXCLUSIONS:-${AIM_ROOT}/exclusions.csv}"
   [[ "$AIM_STRICT" == "true" ]] && echo "STRICT QC  : on (separate exports and results)"
   echo "gene lists : ${AIM_GENE_LISTS:-/miridan-data/annaludmir/ndd_gene_modules/data/genes/final_genes_to_run_on (default)}"
+  echo "annotations: ${AIM_ANNOTATIONS:-/miridan-data/annaludmir/aim_annotations (default; fetch_annotations.sh)}"
   [[ -n "$LIMIT_CELLS" ]] && echo "LIMIT_CELLS: ${LIMIT_CELLS}  (SMOKE TEST -- results are partial)"
   echo "started    : $(date '+%F %T')"
   echo "=============================================================="

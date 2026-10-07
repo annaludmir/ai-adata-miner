@@ -34,6 +34,15 @@ GENE_LISTS_DIR = Path(os.environ.get(
     _CLUSTER_GENE_LISTS if _CLUSTER_GENE_LISTS.exists() else REPO_ROOT / "gene_lists"))
 SCHEMA_DIR = REPO_ROOT / "schemas"
 
+# External annotation files for step-3 part C (GO / pathway .gmt, TF lists and
+# targets, gnomAD constraint, HPO disease genes, ligand-receptor pairs, HGNC,
+# BrainSpan), fetched by running_scripts/fetch_annotations.sh. Kept outside git
+# (sizes, licences). Override with AIM_ANNOTATIONS.
+_CLUSTER_ANNOTATIONS = Path("/miridan-data/annaludmir/aim_annotations")
+ANNOTATIONS_DIR = Path(os.environ.get(
+    "AIM_ANNOTATIONS",
+    _CLUSTER_ANNOTATIONS if _CLUSTER_ANNOTATIONS.exists() else REPO_ROOT / "annotations"))
+
 # ---------------------------------------------------------------------------
 # Dataset registry
 # ---------------------------------------------------------------------------
