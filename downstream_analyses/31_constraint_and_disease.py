@@ -145,7 +145,7 @@ def main() -> None:
                 "richer in Mendelian disease genes (share; null)"
             f.append(f"**Gene sets {label}**: " + ("; ".join(
                 f"{x.dataset} {x.gene_set} {x.mean:.2f} vs {x.null_mean:.2f}"
-                for x in low.sort_values("effect_vs_null_sd", ascending=stat != "mean LOEUF").head(MAX_LISTED * 2).itertuples())
+                for x in low.sort_values("effect_vs_null_sd", ascending=stat == "mean LOEUF").head(MAX_LISTED * 2).itertuples())
                 if len(low) else "none at q < 0.05") + ".")
     if not rel.empty:
         for relation, g in rel.groupby("relation", sort=False):
