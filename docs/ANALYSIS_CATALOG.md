@@ -110,6 +110,13 @@ HGNC and BrainSpan into `AIM_ANNOTATIONS`. Analyses: functional enrichment
 signalling (32), HGNC symbol rescue (33; also used by every list analysis),
 BrainSpan validation (34). OMIM itself is licensed and not fetched.
 
+**Neuron types -- built**: stage-2 script 23 calls every neuron and neuroblast
+excitatory or inhibitory from transmitter and lineage genes; analysis 35 tracks
+the inhibitory share over age within regions, compares the types at matched
+region x age, and splits list age trends by type. cortex (EMX1 lineage) holds
+essentially no inhibitory neurons (GAD1 in 0.2% of neurons), so the
+comparisons are human_dev's.
+
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse
 labels for different cells, so "cluster 12" in v2 is not cluster 12 in v3;

@@ -60,5 +60,6 @@ aim_run 17_gsea_panels
 aim_run 18_chemistry_comparability
 aim_run 19_rg_subtypes
 aim_run 22_cell_level_programs
+aim_run 23_neuron_types
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1

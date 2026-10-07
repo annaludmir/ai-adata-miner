@@ -52,5 +52,6 @@ aim_run 09_pseudobulk --top-genes "$TOP_GENES"
 aim_run 12_splicing_layers     # needs spliced/unspliced layers -- cortex only
 aim_run 19_rg_subtypes         # oRG vs vRG per radial-glia cell; reads 09's gene selection
 aim_run 22_cell_level_programs # per-cell programme scores + within-cell co-expression; reads 09's gene totals
+aim_run 23_neuron_types        # excitatory vs inhibitory call per neuron / neuroblast + pseudobulks; reads 09's gene selection
 
 (( ${#AIM_FAILED[@]} == 0 )) || exit 1
