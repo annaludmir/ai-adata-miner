@@ -105,7 +105,9 @@ def part_b(out: C.Output) -> pd.DataFrame:
                 rows.append({"dataset": ds, "chemistry": chem, "cell_class": k[0],
                              "region": k[1] if len(k) > 1 else "all", "n_ages": len(g), "rho_vs_age": rho,
                              "perm_p": float(pp[0]), "share_youngest": float(share[0]), "share_oldest": float(share[-1]),
-                             "mean_share": float(g.inhibitory.sum() / g.assigned.sum())})
+                             "mean_share": float(g.inhibitory.sum() / g.assigned.sum()),
+                             "unassigned_share": float(g.unassigned.sum() / (g.assigned + g.ambiguous
+                                                                             + g.unassigned).sum())})
     return pd.DataFrame(rows)
 
 
@@ -193,11 +195,14 @@ def main() -> None:
                     [], [])
         return
     checks = pd.concat(checks, ignore_index=True)
-    sets_by_ds = {ds: C.analysis_gene_sets(ds, groups=("ndd", "marker"), modules=False, out=out) for ds in C.DATASETS}
+    # the genes that made the calls would make any set holding them differ by type by construction
+    sets_by_ds = {ds: {k: [g for g in v if g not in MARKERS]
+                       for k, v in C.analysis_gene_sets(ds, groups=("ndd", "marker"), modules=False, out=out).items()}
+                  for ds in C.DATASETS}
     share = part_b(out)
     scomb = C.combine_chemistries(share, ["dataset", "cell_class", "region"], effect="rho_vs_age", weight="n_ages",
                                   labels=("inhibitory share rises", "inhibitory share falls"),
-                                  carry=("share_youngest", "share_oldest", "mean_share")) if len(share) else pd.DataFrame()
+                                  carry=("share_youngest", "share_oldest", "mean_share", "unassigned_share")) if len(share) else pd.DataFrame()
     genes, sets_c = part_c(out, sets_by_ds, rng)
     gcomb = pd.DataFrame()
     if len(genes):
@@ -233,7 +238,8 @@ def main() -> None:
     if len(scomb):
         rep = scomb[scomb.tier != ""]
         allr = scomb[scomb.region == "all"]
-        f.append("**Inhibitory share** (all regions; youngest -> oldest, v2 / v3): " + "; ".join(
+        f.append("**Inhibitory share** (all regions pooled -- this follows which regions were dissected at each age, "
+                 "so read the per-region rows; youngest -> oldest, v2 / v3): " + "; ".join(
             f"{r.dataset} {r.cell_class} {r.share_youngest_v2:.0%}->{r.share_oldest_v2:.0%} / "
             f"{r.share_youngest_v3:.0%}->{r.share_oldest_v3:.0%} ({r.tier or 'n.s.'})" for r in allr.itertuples()) + ".")
         reg = rep[rep.region != "all"]
@@ -241,6 +247,16 @@ def main() -> None:
             f"{r.dataset} {r.cell_class} in {r.region} {r.direction.replace('inhibitory share ', '')} "
             f"({r.share_youngest_v2:.0%}->{r.share_oldest_v2:.0%} / {r.share_youngest_v3:.0%}->{r.share_oldest_v3:.0%}; {r.tier})"
             for r in reg.itertuples()) if len(reg) else "none replicated") + ".")
+        byreg = share[share.region != "all"].groupby(["dataset", "cell_class", "region"])[
+            ["mean_share", "unassigned_share"]].mean().reset_index()
+        if len(byreg):
+            f.append("**Inhibitory share of assigned cells / unassigned share of all cells, per region** (mean of "
+                     "chemistries): " + "; ".join(
+                         f"{ds} {cls}: " + ", ".join(f"{r.region} {r.mean_share:.0%} / {r.unassigned_share:.0%}"
+                                                     for r in g.itertuples())
+                         for (ds, cls), g in byreg.groupby(["dataset", "cell_class"])) + ". Where many cells are unassigned "
+                     "(neurons expressing none of the call genes, e.g. glutamatergic types outside the cortex that use "
+                     "other lineage genes), the share among assigned cells can be biased.")
     if len(gcomb) and "call" in gcomb:
         for (ds, cls), g in gcomb.groupby(["dataset", "cell_class"]):
             g = g[~g.gene.isin(MARKERS)]
@@ -251,14 +267,16 @@ def main() -> None:
                      "top inhibitory " + ", ".join(hi.gene.head(10)) + "; top excitatory " + ", ".join(lo.gene.head(10)) + ".")
     if len(ccomb):
         rep = ccomb[(ccomb.tier != "") & ccomb.gene_set.str.startswith(("list:", "seed:"))]
-        f.append("**Gene lists by neuron type** (mean Z difference inhibitory - excitatory, v2/v3): " + ("; ".join(
-            f"{r.dataset} {r.gene_set} {r.direction} in {r.cell_class} ({r.mean_v2:+.2f}/{r.mean_v3:+.2f}; {r.tier})"
+        f.append("**Gene lists by neuron type** (call genes removed; mean Z difference inhibitory - excitatory vs "
+                 "matched random genes, in null SDs, v2/v3): " + ("; ".join(
+            f"{r.dataset} {r.gene_set} {r.direction} in {r.cell_class} ({r.effect_v2:+.1f}/{r.effect_v3:+.1f}; {r.tier})"
             for r in rep.head(MAX_LISTED * 2).itertuples()) if len(rep) else "none replicated") + ".")
     if len(dcomb):
         rep = dcomb[(dcomb.tier != "") & dcomb.gene_set.str.startswith(("list:", "seed:"))]
-        f.append("**List age trends within one neuron type** (mean rho v2/v3): " + ("; ".join(
+        f.append("**List age trends within one neuron type** (v2/v3): " + ("; ".join(
             f"{r.dataset} {r.gene_set} {r.direction} in {r.type} {r.cell_class.lower()}s ({r.scope}; "
-            f"{r.mean_v2:+.2f}/{r.mean_v3:+.2f}; {r.tier})" for r in rep.head(MAX_LISTED * 2).itertuples())
+            f"rho {r.mean_v2:+.2f}/{r.mean_v3:+.2f}, {r.effect_v2:+.1f}/{r.effect_v3:+.1f} SD vs matched genes; {r.tier})"
+            for r in rep.head(MAX_LISTED * 2).itertuples())
             if len(rep) else "none replicated") + ".")
         p06 = C.RESULTS / "06_gene_list_landscape" / "list_age_coordination_combined.csv"
         if p06.exists():
@@ -285,7 +303,7 @@ def main() -> None:
          f"per region; Spearman with age (>= {MIN_AGES} ages), exact permutation; v2 x v3 signed Stouffer, tiered.",
          f"C: log2 TMM-CPM over a class's type x region x age pseudobulks; inhibitory - excitatory within each region "
          f"x age point holding >= {MIN_CELLS} cells of both, averaged; sets vs {N_RANDOM:,} random sets matched on "
-         "expression decile; v2 x v3 combined, tiered.",
+         "expression decile, after removing the call genes from every set; v2 x v3 combined, tiered.",
          "D: per class:type, pseudobulk per age (all regions; telencephalon only in human_dev); gene Spearman with "
          "age; list mean rho vs matched null; v2 x v3 combined, tiered."],
         f,
