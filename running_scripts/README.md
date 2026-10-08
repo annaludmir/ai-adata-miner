@@ -104,6 +104,40 @@ Download them once, on the login node (light, ~0.4 GB, about two minutes):
 Without them those analyses say so and skip. Once the HGNC table is there,
 gene-list matching everywhere also uses HGNC previous symbols.
 
+## Spectra gene programmes (scripts 24-25, analysis 36)
+
+Spectra fits gene programmes guided by prior gene sets (lists, seed panels, core
+GO processes, class markers). It runs separately from the four stages, one
+dataset x chemistry per job, after stages 1-2 and `fetch_annotations.sh`.
+
+Install once into the env (the `setuptools` pin is needed: Spectra still imports
+`pkg_resources`):
+
+```bash
+mamba run -p "$AIM_ENV" pip install scSpectra "setuptools<81"
+```
+
+CPU (the published model; ~1-2 h per stratum on 16 cores):
+
+```bash
+for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_spectra.sh
+done; done
+```
+
+GPU (the package's minibatched `Spectra_gpu`, which its authors mark as in
+development; needs a CUDA build of torch in the env):
+
+```bash
+sbatch --partition=<gpu partition> --gres=gpu:1 \
+       --export=ALL,DATASET=human_dev,CHEMISTRY=v2,SPECTRA_BACKEND=gpu slurm_spectra.sh
+```
+
+The subsample goes to `AIM_WORK` (default `/miridan-data/annaludmir/aim_work`),
+the results to `csv_exports/<ns>/25_spectra/`. `SKIP_INPUT=true` refits without
+redrawing the subsample; `SPECTRA_EPOCHS` overrides the epoch count. Rerun
+step 3 (or just analysis 36) afterwards.
+
 ## Knobs
 
 All read from the environment, all forwarded through the chain by `submit_all.sh`.

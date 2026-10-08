@@ -117,6 +117,20 @@ region x age, and splits list age trends by type. cortex (EMX1 lineage) holds
 essentially no inhibitory neurons (GAD1 in 0.2% of neurons), so the
 comparisons are human_dev's.
 
+**Knowledge-guided gene programmes (Spectra) -- built**: script 24 draws a
+stratified ~25k-cell subsample per dataset x chemistry into `AIM_WORK`;
+script 25 fits Spectra (Kunes et al. 2023) with a prior of the user lists, seed
+NDD and cell-cycle panels, 29 core GO processes and class markers, plus free
+factors (`running_scripts/slurm_spectra.sh`, one stratum per job, cpu or gpu).
+Analysis 36 does not trust a factor's label, since a prior-steered factor can
+echo its prior regardless of the data: it pairs v2 and v3 factors by gene
+weights, tests each factor's top genes for co-expression in the other
+chemistry's cluster pseudobulks (independent donors) against matched genes,
+tests whether genes Spectra added to a list co-vary with the list genes it kept,
+reports list genes added or dropped in both fits, tracks programme activity
+over age per class, and checks new factors against the 08 modules. Next
+candidates: STRING-expanded priors and a data-driven comparison (scHPF / cNMF).
+
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse
 labels for different cells, so "cluster 12" in v2 is not cluster 12 in v3;

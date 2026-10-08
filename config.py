@@ -130,6 +130,11 @@ VAR_ACCESSION_CANDIDATES = ["Accession", "gene_ids", "ensembl_id"]
 # Embeddings worth summarising, in preference order.
 EMBEDDING_KEYS = ["X_umap", "UMAP", "X_Embedding", "X_scVI", "TSNE", "PCA"]
 
+# Working files that are not CSV exports (e.g. the cell subsamples and fitted
+# models of the Spectra pipeline, scripts 24-25). Outside git. Override with AIM_WORK.
+_CLUSTER_WORK = Path("/miridan-data/annaludmir/aim_work")
+WORK_DIR = Path(os.environ.get("AIM_WORK", _CLUSTER_WORK if _CLUSTER_WORK.parent.exists() else REPO_ROOT / "work"))
+
 # Lineage pseudotime (script 20): the latent space each file stores, the
 # dorsal neurogenic lineage in order, and -- for the whole-brain atlas -- the
 # region whose cells form that lineage (other regions have other lineages).
