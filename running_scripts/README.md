@@ -114,8 +114,15 @@ Install once into the env (the `setuptools` pin is needed: Spectra still imports
 `pkg_resources`):
 
 ```bash
-mamba run -p "$AIM_ENV" pip install scSpectra "setuptools<81"
+/miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python -m pip install scSpectra "setuptools<81"
 ```
+
+Call the env's python by path: `$AIM_ENV` is set only inside the Slurm scripts,
+and `conda activate` on the login node leaves the shared mamba python and pip
+first on PATH. That env's python also reads `~/.local/lib/python3.10`, ahead of
+its own packages, so anything installed with `pip --user` changes every stage.
+Check what a job will import with
+`$ENV/bin/python -c "import anndata; print(anndata.__version__, anndata.__file__)"`.
 
 CPU (the published model; ~1-2 h per stratum on 16 cores):
 

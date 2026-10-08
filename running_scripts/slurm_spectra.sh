@@ -20,7 +20,7 @@
 # Needs stages 1-2 (and the annotation folder for the GO prior). Step-3
 # analysis 36 reads the outputs.
 #
-# The conda env needs:  mamba run -p "$AIM_ENV" pip install scSpectra "setuptools<81"
+# The conda env needs:  /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python -m pip install scSpectra "setuptools<81"
 # (torch comes with scSpectra; for the gpu backend install a CUDA build of torch).
 #
 # CPU (default; ~1-2 h per stratum at 16 cores):
