@@ -7,7 +7,7 @@
 #SBATCH --account=miridan-users_v2
 #SBATCH --output=/miridan-data/annaludmir/jobs_output/%j.out
 #SBATCH --error=/miridan-data/annaludmir/jobs_output/%j.err
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --partition=power-general-public-pool
 #SBATCH --qos=public
 
@@ -23,7 +23,7 @@
 # The conda env needs:  /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python -m pip install scSpectra "setuptools<81"
 # (torch comes with scSpectra; for the gpu backend install a CUDA build of torch).
 #
-# CPU (default; ~1-2 h per stratum at 16 cores):
+# CPU (default; 2-6 h per stratum at 16 cores, up to 10000 epochs at ~2-4 s each):
 #   for ds in cortex human_dev; do for ch in v2 v3; do
 #     sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_spectra.sh; done; done
 # GPU (the package's minibatched Spectra_gpu module):

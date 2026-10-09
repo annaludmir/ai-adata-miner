@@ -69,6 +69,66 @@ N_TOP = 50
 LR_SCHEDULE = [1.0, 0.5, 0.1, 0.01, 0.001, 0.0001]     # Spectra's default
 
 
+def plateau_train(plateau: int, rec: dict, rel_tol: float = 1e-4):
+    """A replacement for Spectra's SPECTRA_Model.train with a plateau rule.
+
+    Spectra (0.2.1) lowers the learning rate after every 3 epochs whose loss is
+    not below the previous epoch's and stops after 18 such epochs, counted over
+    the whole run and never reset. The noisy early epochs at high learning rates
+    fill that count, so a fit can end after a few hundred of its 5000 epochs (one
+    did at 431). Here the rate steps down Spectra's own schedule only after
+    `plateau` consecutive epochs without a new best loss (better by rel_tol), and
+    training stops when the last rate has plateaued too or at the epoch limit.
+    plateau=0 reproduces Spectra's own rule. The loss and rate of every epoch go
+    to rec.
+    """
+    import torch
+
+    def train(self, X, labels=None, lr_schedule=LR_SCHEDULE, num_epochs=10000, verbose=False):
+        rates, k = list(lr_schedule), 0
+        opt = torch.optim.Adam(self.internal_model.parameters(), lr=rates[0])
+        best, wait, last, counter = np.inf, 0, np.inf, 0
+        for _ in range(num_epochs):
+            opt.zero_grad()
+            if self.internal_model.use_cell_types:
+                loss = self.internal_model.loss(X, labels)
+            else:
+                loss = self.internal_model.loss_no_cell_types(X)
+            loss.backward()
+            opt.step()
+            v = float(loss.item())
+            rec["loss"].append(v)
+            rec["lr"].append(rates[k])
+            if plateau == 0:                       # Spectra 0.2.1's rule, verbatim
+                if v >= last:
+                    counter += 1
+                    if counter // 3 >= len(rates):
+                        rec["stop"] = "Spectra's rule: 18 epochs without a fall"
+                        break
+                    if counter % 3 == 0:
+                        k = counter // 3
+                        opt = torch.optim.Adam(self.internal_model.parameters(), lr=rates[k])
+                last = v
+                continue
+            if not np.isfinite(best) or v < best - rel_tol * abs(best):
+                best, wait = v, 0
+                continue
+            wait += 1
+            if wait >= plateau:
+                k += 1
+                if k == len(rates):
+                    rec["stop"] = "converged: no new best at the last learning rate"
+                    break
+                opt = torch.optim.Adam(self.internal_model.parameters(), lr=rates[k])
+                wait = 0
+        if self.use_cell_types:
+            self._SPECTRA_Model__store_parameters(labels)
+        else:
+            self._SPECTRA_Model__store_parameters_no_celltypes()
+
+    return train
+
+
 def prior(a) -> tuple[dict, pd.DataFrame]:
     upper = {g.upper(): g for g in a.var_names}
     acc = {str(x).split(".")[0]: g for x, g in zip(a.var["accession"], a.var_names)} if "accession" in a.var else {}
@@ -150,7 +210,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
         + ", ".join(f"{c} {len(v)}" for c, v in gsd.items() if c != "global") + f"; {sum(L.values())} factors")
     log(f"  backend {args.backend}, {args.epochs} epochs, torch threads {torch.get_num_threads()}, "
         f"cuda {'available' if torch.cuda.is_available() else 'not available'}")
-    fit_info = {"epochs_run": np.nan, "epochs_max": args.epochs, "lr_patience": np.nan}
+    fit_info = {"epochs_run": np.nan, "epochs_max": args.epochs, "plateau": np.nan}
     if args.backend == "gpu":
         from Spectra import Spectra_gpu as S
         model = S.est_spectra(adata=a, gene_set_dictionary=gsd, L=L, use_highly_variable=True,
@@ -158,37 +218,28 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
                               n_top_vals=N_TOP, filter_sets=True, num_epochs=args.epochs, batch_size=args.batch_size)
     else:
         from Spectra import Spectra as S
-        # Spectra lowers the learning rate after every 3 epochs whose loss did not fall and stops
-        # after 18 (cumulative, never reset), which can end a fit after a few hundred epochs.
-        # Repeating each step of its schedule lr_patience times keeps the same rates but waits
-        # longer; the loss of every epoch is recorded to show where training ended.
-        sched = [lr for lr in LR_SCHEDULE for _ in range(args.lr_patience)]
-        trace = []
-        orig = S.SPECTRA.loss
-
-        def traced(self, X, labels):
-            v = orig(self, X, labels)
-            trace.append(float(v.detach()))
-            return v
-
-        S.SPECTRA.loss = traced
+        rec = {"loss": [], "lr": [], "stop": "epoch limit"}
+        orig = S.SPECTRA_Model.train
+        S.SPECTRA_Model.train = plateau_train(args.plateau, rec)
         try:
             model = S.est_spectra(adata=a, gene_set_dictionary=gsd, L=L, use_highly_variable=True,
                                   cell_type_key="cell_class", use_weights=True, lam=args.lam, use_cell_types=True,
                                   n_top_vals=N_TOP, filter_sets=True, label_factors=False, num_epochs=args.epochs,
-                                  lr_schedule=sched)
+                                  lr_schedule=LR_SCHEDULE)
         finally:
-            S.SPECTRA.loss = orig
-        if trace:
-            ran = len(trace)
-            log(f"  trained {ran} of {args.epochs} epochs (lr patience {args.lr_patience}); loss {trace[0]:.4g} -> "
-                f"{trace[-1]:.4g}" + ("" if ran >= args.epochs else
-                                      " -- STOPPED EARLY: loss stopped falling; compare with the other fits"))
+            S.SPECTRA_Model.train = orig
+        if rec["loss"]:
+            tr, ran = rec["loss"], len(rec["loss"])
+            steps = [f"{lr:g}@{i + 1}" for i, lr in enumerate(rec["lr"]) if i == 0 or lr != rec["lr"][i - 1]]
+            log(f"  trained {ran} of {args.epochs} epochs ({rec['stop']}); learning rate {', '.join(steps)}; "
+                f"loss {tr[0]:.4g} -> {tr[-1]:.4g} (best {min(tr):.4g})")
             step = max(1, ran // 1000)
-            man.write(pd.DataFrame({"epoch": np.arange(1, ran + 1)[::step], "loss": trace[::step]}),
-                      "training_trace", "Loss per training epoch (thinned to <= 1000 rows)", subdir=SUBDIR)
-            fit_info = {"epochs_run": ran, "epochs_max": args.epochs, "lr_patience": args.lr_patience,
-                        "first_loss": trace[0], "final_loss": trace[-1]}
+            man.write(pd.DataFrame({"epoch": np.arange(1, ran + 1)[::step], "loss": tr[::step],
+                                    "learning_rate": rec["lr"][::step]}),
+                      "training_trace", "Loss and learning rate per epoch (thinned to <= 1000 rows)", subdir=SUBDIR)
+            fit_info = {"epochs_run": ran, "epochs_max": args.epochs, "plateau": args.plateau,
+                        "stop_reason": rec["stop"], "final_learning_rate": rec["lr"][-1],
+                        "first_loss": tr[0], "final_loss": tr[-1], "best_loss": min(tr)}
     factors = np.asarray(a.uns["SPECTRA_factors"])
     scores = np.asarray(a.obsm["SPECTRA_cell_scores"])
     vocab = np.asarray(a.var_names[a.var["spectra_vocab"].to_numpy(bool)])
@@ -254,14 +305,16 @@ def main() -> None:
     p = cli.build_parser(__doc__)
     p.add_argument("--backend", choices=["cpu", "gpu"], default=os.environ.get("SPECTRA_BACKEND", "cpu"))
     p.add_argument("--epochs", type=int, default=int(os.environ.get("SPECTRA_EPOCHS", 0)) or None,
-                   help="training epochs (default 5000 for cpu, 50 minibatch epochs for gpu)")
+                   help="maximum training epochs (default 10000 for cpu -- the plateau rule usually stops "
+                        "earlier; 50 minibatch epochs for gpu)")
     p.add_argument("--batch-size", type=int, default=1000, help="gpu backend: cells per minibatch")
     p.add_argument("--lam", type=float, default=0.01, help="weight of the prior graph vs expression")
-    p.add_argument("--lr-patience", type=int, default=int(os.environ.get("SPECTRA_LR_PATIENCE", 3)),
-                   help="cpu backend: repeat each learning-rate step this many times (1 = Spectra's default)")
+    p.add_argument("--plateau", type=int, default=int(os.environ.get("SPECTRA_PLATEAU", 50)),
+                   help="cpu backend: lower the learning rate after this many epochs without a new best loss; "
+                        "0 = Spectra's own training rule")
     args = p.parse_args()
     if args.epochs is None:
-        args.epochs = 5000 if args.backend == "cpu" else 50
+        args.epochs = 10000 if args.backend == "cpu" else 50
     for key, chem, ns in cli.dataset_variants(args):
         run(key, args, chem, ns)
 

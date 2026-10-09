@@ -124,7 +124,7 @@ its own packages, so anything installed with `pip --user` changes every stage.
 Check what a job will import with
 `$ENV/bin/python -c "import anndata; print(anndata.__version__, anndata.__file__)"`.
 
-CPU (the published model; ~1-2 h per stratum on 16 cores):
+CPU (the published model; 2-6 h per stratum on 16 cores):
 
 ```bash
 for ds in cortex human_dev; do for ch in v2 v3; do
@@ -144,12 +144,16 @@ The subsample goes to `AIM_WORK` (default `/miridan-data/annaludmir/aim_work`),
 the results to `csv_exports/<ns>/25_spectra/`. `SKIP_INPUT=true` refits without
 redrawing the subsample; `SPECTRA_EPOCHS` overrides the epoch count.
 
-Spectra stops training once the loss has failed to fall in 18 epochs (counted
-over the whole run), which ended one fit at epoch 431 of 5000. Script 25 repeats
-each learning-rate step `SPECTRA_LR_PATIENCE` times (default 3; 1 = Spectra's
-own schedule) and writes `25_spectra/fit_summary.csv` (epochs run, first / final
-loss) and `training_trace.csv`; the job log says `STOPPED EARLY` when a fit ends
-before the epoch limit. Fit all four strata with the same settings. Rerun
+Spectra's own training rule lowers the learning rate after every 3 epochs whose
+loss did not fall and stops after 18, counted over the whole run; the noisy
+early epochs fill that count, so one fit ended at epoch 431 and the others spent
+most of their 5000 epochs at a rate of 0.001. Script 25 replaces it with a
+plateau rule: the same rates, each lowered only after `SPECTRA_PLATEAU` (default
+50) epochs without a new best loss, stopping when the last rate stops improving
+or at `SPECTRA_EPOCHS` (default 10000). `SPECTRA_PLATEAU=0` restores Spectra's
+rule. The job log and `25_spectra/fit_summary.csv` give the epochs run, why
+training stopped and the rate steps; `training_trace.csv` the loss per epoch.
+Fit all four strata with the same settings. Rerun
 step 3 (or just analysis 36) afterwards.
 
 ## Knobs

@@ -251,7 +251,7 @@ def main() -> None:
             r = pd.read_csv(fs).iloc[0]
             if pd.notna(r.epochs_run):
                 trained[(ds, chem)] = (f", {int(r.epochs_run)} of {int(r.epochs_max)} epochs"
-                                       + (" (STOPPED EARLY)" if r.epochs_run < r.epochs_max else ""))
+                                       + (f" ({r.stop_reason})" if "stop_reason" in r else ""))
     ov = overview.groupby(["dataset", "chemistry"]).apply(
         lambda g: f"{len(g)} factors, {int((g.label != 'new').sum())} recovering a prior set, "
                   f"{int((g.label == 'new').sum())} new", include_groups=False)
