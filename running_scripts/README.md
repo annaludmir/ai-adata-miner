@@ -142,7 +142,14 @@ sbatch --partition=<gpu partition> --gres=gpu:1 \
 
 The subsample goes to `AIM_WORK` (default `/miridan-data/annaludmir/aim_work`),
 the results to `csv_exports/<ns>/25_spectra/`. `SKIP_INPUT=true` refits without
-redrawing the subsample; `SPECTRA_EPOCHS` overrides the epoch count. Rerun
+redrawing the subsample; `SPECTRA_EPOCHS` overrides the epoch count.
+
+Spectra stops training once the loss has failed to fall in 18 epochs (counted
+over the whole run), which ended one fit at epoch 431 of 5000. Script 25 repeats
+each learning-rate step `SPECTRA_LR_PATIENCE` times (default 3; 1 = Spectra's
+own schedule) and writes `25_spectra/fit_summary.csv` (epochs run, first / final
+loss) and `training_trace.csv`; the job log says `STOPPED EARLY` when a fit ends
+before the epoch limit. Fit all four strata with the same settings. Rerun
 step 3 (or just analysis 36) afterwards.
 
 ## Knobs

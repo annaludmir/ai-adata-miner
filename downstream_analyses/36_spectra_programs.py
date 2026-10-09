@@ -234,10 +234,19 @@ def main() -> None:
     out.write(refine, "list_refinement", "Per list-labelled factor pair: genes added in both fits, list genes dropped in both")
 
     f = []
+    trained = {}
+    for ds, chem in C.STRATA:
+        fs = C.EXPORTS / C.ns(ds, chem) / "25_spectra" / "fit_summary.csv"
+        if fs.exists():
+            out.used(f"{C.ns(ds, chem)}/25_spectra/fit_summary.csv")
+            r = pd.read_csv(fs).iloc[0]
+            if pd.notna(r.epochs_run):
+                trained[(ds, chem)] = (f", {int(r.epochs_run)} of {int(r.epochs_max)} epochs"
+                                       + (" (STOPPED EARLY)" if r.epochs_run < r.epochs_max else ""))
     ov = overview.groupby(["dataset", "chemistry"]).apply(
         lambda g: f"{len(g)} factors, {int((g.label != 'new').sum())} recovering a prior set, "
                   f"{int((g.label == 'new').sum())} new", include_groups=False)
-    f.append("**Fits**: " + "; ".join(f"{ds} {ch}: {v}" for (ds, ch), v in ov.items()) + ".")
+    f.append("**Fits**: " + "; ".join(f"{ds} {ch}: {v}{trained.get((ds, ch), '')}" for (ds, ch), v in ov.items()) + ".")
     if len(pairs):
         for ds, g in pairs.groupby("dataset"):
             same = g[g.label_v2 == g.label_v3]

@@ -66,6 +66,7 @@ MIN_SET_GENES = 5
 N_NEW_GLOBAL = 5
 OVERLAP_MIN = 0.2
 N_TOP = 50
+LR_SCHEDULE = [1.0, 0.5, 0.1, 0.01, 0.001, 0.0001]     # Spectra's default
 
 
 def prior(a) -> tuple[dict, pd.DataFrame]:
@@ -149,6 +150,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
         + ", ".join(f"{c} {len(v)}" for c, v in gsd.items() if c != "global") + f"; {sum(L.values())} factors")
     log(f"  backend {args.backend}, {args.epochs} epochs, torch threads {torch.get_num_threads()}, "
         f"cuda {'available' if torch.cuda.is_available() else 'not available'}")
+    fit_info = {"epochs_run": np.nan, "epochs_max": args.epochs, "lr_patience": np.nan}
     if args.backend == "gpu":
         from Spectra import Spectra_gpu as S
         model = S.est_spectra(adata=a, gene_set_dictionary=gsd, L=L, use_highly_variable=True,
@@ -156,9 +158,37 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
                               n_top_vals=N_TOP, filter_sets=True, num_epochs=args.epochs, batch_size=args.batch_size)
     else:
         from Spectra import Spectra as S
-        model = S.est_spectra(adata=a, gene_set_dictionary=gsd, L=L, use_highly_variable=True,
-                              cell_type_key="cell_class", use_weights=True, lam=args.lam, use_cell_types=True,
-                              n_top_vals=N_TOP, filter_sets=True, label_factors=False, num_epochs=args.epochs)
+        # Spectra lowers the learning rate after every 3 epochs whose loss did not fall and stops
+        # after 18 (cumulative, never reset), which can end a fit after a few hundred epochs.
+        # Repeating each step of its schedule lr_patience times keeps the same rates but waits
+        # longer; the loss of every epoch is recorded to show where training ended.
+        sched = [lr for lr in LR_SCHEDULE for _ in range(args.lr_patience)]
+        trace = []
+        orig = S.SPECTRA.loss
+
+        def traced(self, X, labels):
+            v = orig(self, X, labels)
+            trace.append(float(v.detach()))
+            return v
+
+        S.SPECTRA.loss = traced
+        try:
+            model = S.est_spectra(adata=a, gene_set_dictionary=gsd, L=L, use_highly_variable=True,
+                                  cell_type_key="cell_class", use_weights=True, lam=args.lam, use_cell_types=True,
+                                  n_top_vals=N_TOP, filter_sets=True, label_factors=False, num_epochs=args.epochs,
+                                  lr_schedule=sched)
+        finally:
+            S.SPECTRA.loss = orig
+        if trace:
+            ran = len(trace)
+            log(f"  trained {ran} of {args.epochs} epochs (lr patience {args.lr_patience}); loss {trace[0]:.4g} -> "
+                f"{trace[-1]:.4g}" + ("" if ran >= args.epochs else
+                                      " -- STOPPED EARLY: loss stopped falling; compare with the other fits"))
+            step = max(1, ran // 1000)
+            man.write(pd.DataFrame({"epoch": np.arange(1, ran + 1)[::step], "loss": trace[::step]}),
+                      "training_trace", "Loss per training epoch (thinned to <= 1000 rows)", subdir=SUBDIR)
+            fit_info = {"epochs_run": ran, "epochs_max": args.epochs, "lr_patience": args.lr_patience,
+                        "first_loss": trace[0], "final_loss": trace[-1]}
     factors = np.asarray(a.uns["SPECTRA_factors"])
     scores = np.asarray(a.obsm["SPECTRA_cell_scores"])
     vocab = np.asarray(a.var_names[a.var["spectra_vocab"].to_numpy(bool)])
@@ -190,6 +220,10 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     info = pd.DataFrame(info)
     sets["in_prior"] = sets.set.isin(flat)
     man.write(sets, "prior_sets", "Prior gene sets: scope, genes in the input, genes found in the subsample",
+              subdir=SUBDIR)
+    man.write(pd.DataFrame([{**fit_info, "backend": args.backend, "n_cells": a.n_obs, "n_model_genes": len(vocab),
+                             "n_factors": factors.shape[0], "lam": args.lam}]),
+              "fit_summary", "Training: epochs run of the maximum, learning-rate patience, first / final loss",
               subdir=SUBDIR)
     man.write(info, "factor_info", f"Per factor: scope, best prior set by overlap coefficient of its top {N_TOP} "
               f"genes, label ('new' below {OVERLAP_MIN}), top genes", subdir=SUBDIR)
@@ -223,6 +257,8 @@ def main() -> None:
                    help="training epochs (default 5000 for cpu, 50 minibatch epochs for gpu)")
     p.add_argument("--batch-size", type=int, default=1000, help="gpu backend: cells per minibatch")
     p.add_argument("--lam", type=float, default=0.01, help="weight of the prior graph vs expression")
+    p.add_argument("--lr-patience", type=int, default=int(os.environ.get("SPECTRA_LR_PATIENCE", 3)),
+                   help="cpu backend: repeat each learning-rate step this many times (1 = Spectra's default)")
     args = p.parse_args()
     if args.epochs is None:
         args.epochs = 5000 if args.backend == "cpu" else 50
