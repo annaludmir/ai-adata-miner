@@ -24,7 +24,8 @@ Method
      with age per class (>= 5 ages), exact permutation; replicated factor pairs
      combined across chemistries (signed Stouffer, BH, tiered).
   E. NDD lists: for list-labelled factor pairs, genes added in both fits and
-     list genes dropped in both (in the model but outside the top 200).
+     list genes kept in both (weight above the 95th percentile of non-list genes
+     in the factor) and dropped in both (weight at or below their median).
 
 Inputs: csv_exports/<ds>__<chem>/25_spectra/*; cluster pseudobulks (07/08 rules)
 """
@@ -43,7 +44,7 @@ import _common as C
 SLUG = "36_spectra_programs"
 TITLE = "Spectra gene programmes: held-out support, replication, list refinement and age trends"
 N_TOP = 50
-N_KEEP = 200
+KEEP_Q = 0.95     # a list gene is kept when it outweighs 95% of non-list genes in the factor
 MATCH_MIN = 0.5
 N_RANDOM = 500
 MIN_AGES = 5
@@ -178,17 +179,25 @@ def main() -> None:
                 if str(r.label_v2).startswith("list:") and r.label_v2 == r.label_v3:
                     t2 = set(f2[1].loc[r.factor_v2].sort_values(ascending=False).index[:N_TOP])
                     t3 = set(f3[1].loc[r.factor_v3].sort_values(ascending=False).index[:N_TOP])
-                    k2 = set(f2[1].loc[r.factor_v2].sort_values(ascending=False).index[:N_KEEP])
-                    k3 = set(f3[1].loc[r.factor_v3].sort_values(ascending=False).index[:N_KEEP])
                     members = set(C.mapped_lists(ds, collapse=False).get(r.label_v2.split(":", 1)[1], []))
                     in_model = members & set(f2[1].columns) & set(f3[1].columns)
+                    if not in_model:          # list no longer among the gene lists
+                        continue
+                    kept, dropped = [], []
+                    for fit, fac in ((f2, r.factor_v2), (f3, r.factor_v3)):
+                        wt = fit[1].loc[fac]
+                        bg = wt[~wt.index.isin(list(members))]
+                        kept.append({g for g in in_model if wt[g] > bg.quantile(KEEP_Q)})
+                        dropped.append({g for g in in_model if wt[g] <= bg.median()})
+                    k_both, d_both = kept[0] & kept[1], dropped[0] & dropped[1]
                     refine.append({"dataset": ds, "gene_list": r.label_v2, "factor_v2": r.factor_v2,
                                    "factor_v3": r.factor_v3, "cosine": r.cosine,
                                    "list_genes_in_model": len(in_model),
                                    "added_in_both": "|".join(sorted((t2 & t3) - members)),
-                                   "dropped_in_both": "|".join(sorted(in_model - k2 - k3)),
+                                   "kept_in_both": "|".join(sorted(k_both, key=lambda g: -f2[1].loc[r.factor_v2, g])),
+                                   "dropped_in_both": "|".join(sorted(d_both)),
                                    "n_added_in_both": len((t2 & t3) - members),
-                                   "n_dropped_in_both": len(in_model - k2 - k3)})
+                                   "n_kept_in_both": len(k_both), "n_dropped_in_both": len(d_both)})
     overview = pd.concat(overview, ignore_index=True)
     pairs = pd.concat(pairs_all, ignore_index=True) if pairs_all else pd.DataFrame()
     support = pd.concat(support, ignore_index=True)
@@ -231,7 +240,7 @@ def main() -> None:
               "matched genes; added-vs-kept genes correlation for prior-labelled factors")
     out.write(ages, "factor_age_trends_per_stratum", "Per factor x class: Spearman of mean cell score with age")
     out.write(acomb, "factor_age_trends_combined", "Per replicated factor pair x class: v2 x v3 combined; tier")
-    out.write(refine, "list_refinement", "Per list-labelled factor pair: genes added in both fits, list genes dropped in both")
+    out.write(refine, "list_refinement", "Per list-labelled factor pair: genes added in both fits, list genes kept / dropped in both")
 
     f = []
     trained = {}
@@ -272,14 +281,16 @@ def main() -> None:
         if len(a):
             good = a[(a.added_q < 0.05) & (a.added_effect_vs_null_sd > 0)]
             f.append("**Genes Spectra added to lists and panels that co-vary with the kept genes in held-out donors**: "
-                     + ("; ".join(f"{r.dataset} {r.chemistry} {r.label}: {r.n_added} added, r {r.added_vs_kept_r:.2f} vs "
+                     + ("; ".join(f"{r.dataset} {r.chemistry} {r.label}: {int(r.n_added)} added, r {r.added_vs_kept_r:.2f} vs "
                                   f"{r.added_null_mean:.2f} ({', '.join(str(r.added_genes).split('|')[:8])})"
                                   for r in good.head(MAX_LISTED).itertuples()) if len(good) else "none") + ".")
-    ref = refine[(refine.n_added_in_both > 0) | (refine.n_dropped_in_both > 0)] if len(refine) else refine
-    if len(ref):
-        f.append("**List refinement consistent across both fits**: " + "; ".join(
-            f"{r.dataset} {r.gene_list}: +{r.n_added_in_both} added ({', '.join(r.added_in_both.split('|')[:8])}), "
-            f"-{r.n_dropped_in_both} of {r.list_genes_in_model} dropped" for r in ref.itertuples()) + ".")
+    if len(refine):
+        f.append("**What each list's programme keeps, consistently in both fits** (of the list genes in the model: "
+                 "kept / dropped; strongest kept; genes added from outside the list): " + "; ".join(
+            f"{r.dataset} {r.gene_list}: {r.n_kept_in_both} / {r.n_dropped_in_both} of {r.list_genes_in_model} "
+            f"({', '.join(str(r.kept_in_both).split('|')[:6])})"
+            + (f", +{r.n_added_in_both} added ({', '.join(r.added_in_both.split('|')[:6])})" if r.n_added_in_both else "")
+            for r in refine.itertuples()) + ".")
     if "best_08_module_overlap" in overview:
         nm = overview[(overview.label == "new") & (overview.best_08_module_overlap < 0.2)]
         f.append(f"**New programmes vs the 08 co-expression modules**: {int((overview.label == 'new').sum())} new "
@@ -302,8 +313,8 @@ def main() -> None:
          f"factor's top {N_TOP} genes across the other chemistry's cluster pseudobulks vs {N_RANDOM} random sets matched "
          "on level x spread; added genes' correlation with kept prior genes vs matched random genes; BH.",
          f"Age: Spearman of mean cell score per class x age (>= {MIN_AGES} ages); replicated pairs combined (signed "
-         "Stouffer, BH, tiered). Lists: added = top-50 in both fits and not in the list; dropped = in the model but "
-         f"outside the top {N_KEEP} in both."],
+         "Stouffer, BH, tiered). Lists: added = top-50 in both fits and not in the list; kept = weight above "
+         f"the {KEEP_Q:.0%} quantile of non-list genes in both; dropped = at or below their median in both."],
         f,
         ["A prior-steered factor can echo its prior whatever the data; only the held-out tests and the v2 / v3 "
          "replication speak to support.",
