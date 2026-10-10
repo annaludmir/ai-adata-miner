@@ -281,11 +281,19 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     w = pd.DataFrame(factors, index=info.factor, columns=vocab)
     man.write(w.reset_index(), "factor_gene_weights", "Gene weights per factor (factors x model genes)",
               subdir=SUBDIR)
-    obs = a.obs.copy()
-    S = pd.DataFrame(scores, index=obs.index, columns=info.factor)
-    groups = {"cell_class": obs.cell_class.astype(str)}
+    write_group_scores(man, a.obs, scores, list(info.factor))
+    man.flush()
+
+
+def write_group_scores(man: Manifest, obs: pd.DataFrame, scores: np.ndarray, factors: list[str]) -> None:
+    """Mean cell score per factor in each class, class x age, class x region x age and donor."""
+    S = pd.DataFrame(scores, index=obs.index, columns=factors)
+    cls = obs.cell_class.astype(str)
+    groups = {"cell_class": cls}
     if "age_pcw" in obs:
-        groups["cell_class_x_age"] = obs.cell_class.astype(str) + " | " + obs.age_pcw.astype(str)
+        groups["cell_class_x_age"] = cls + " | " + obs.age_pcw.astype(str)
+        if "region" in obs:
+            groups["cell_class_x_region_x_age"] = cls + " | " + obs.region.astype(str) + " | " + obs.age_pcw.astype(str)
     if "donor" in obs:
         groups["donor"] = obs.donor.astype(str)
     long = []
@@ -297,7 +305,27 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
         t["n_cells"] = t.group.map(n).astype(int)
         long.append(t)
     man.write(pd.concat(long, ignore_index=True), "factor_scores_by_group",
-              "Mean cell score per factor per class, class x age and donor", subdir=SUBDIR)
+              "Mean cell score per factor per class, class x age, class x region x age and donor", subdir=SUBDIR)
+
+
+def rescore(key: str, chem: str | None = None, ns: str | None = None) -> None:
+    """Rewrite factor_scores_by_group from a finished fit's saved cell scores (no refit)."""
+    import anndata as ad
+    ns = ns or key
+    cli.banner(SCRIPT, key, chem)
+    man = Manifest(ns, SCRIPT)
+    work = config.WORK_DIR / "spectra" / ns
+    info_csv = config.CSV_EXPORTS / ns / SUBDIR / "factor_info.csv"
+    if not ((work / "cell_scores.npz").exists() and (work / "input.h5ad").exists() and info_csv.exists()):
+        log(f"  no finished fit for {ns} (cell_scores.npz, input.h5ad, factor_info.csv); skipping")
+        man.flush()
+        return
+    z = np.load(work / "cell_scores.npz", allow_pickle=True)
+    obs = ad.read_h5ad(work / "input.h5ad", backed="r").obs.copy()
+    obs = obs.loc[pd.Index(z["cells"].astype(str))]
+    factors = list(pd.read_csv(info_csv).factor)
+    log(f"  rescoring {len(obs):,} cells x {len(factors)} factors from {work / 'cell_scores.npz'}")
+    write_group_scores(man, obs, z["scores"], factors)
     man.flush()
 
 
@@ -312,7 +340,13 @@ def main() -> None:
     p.add_argument("--plateau", type=int, default=int(os.environ.get("SPECTRA_PLATEAU", 50)),
                    help="cpu backend: lower the learning rate after this many epochs without a new best loss; "
                         "0 = Spectra's own training rule")
+    p.add_argument("--rescore", action="store_true",
+                   help="only rewrite factor_scores_by_group from the saved cell scores of a finished fit")
     args = p.parse_args()
+    if args.rescore:
+        for key, chem, ns in cli.dataset_variants(args):
+            rescore(key, chem, ns)
+        return
     if args.epochs is None:
         args.epochs = 10000 if args.backend == "cpu" else 50
     for key, chem, ns in cli.dataset_variants(args):

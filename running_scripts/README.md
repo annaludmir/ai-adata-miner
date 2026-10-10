@@ -153,6 +153,14 @@ plateau rule: the same rates, each lowered only after `SPECTRA_PLATEAU` (default
 or at `SPECTRA_EPOCHS` (default 10000). `SPECTRA_PLATEAU=0` restores Spectra's
 rule. The job log and `25_spectra/fit_summary.csv` give the epochs run, why
 training stopped and the rate steps; `training_trace.csv` the loss per epoch.
+
+To rewrite the per-group scores of finished fits (e.g. after a grouping is
+added) without refitting, run on a compute node:
+
+```bash
+srun --account=miridan-users_v2 --partition=power-general-public-pool --qos=public --mem=16G --time=00:30:00 \
+  /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python scripts_generated/25_spectra_fit.py --rescore
+```
 Fit all four strata with the same settings. Rerun
 step 3 (or just analysis 36) afterwards.
 
