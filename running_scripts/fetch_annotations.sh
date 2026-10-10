@@ -24,7 +24,7 @@ else
   OUT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/annotations"
 fi
 FORCE="${FORCE:-false}"
-mkdir -p "$OUT"/{gmt,tf,constraint,disease,lr,hgnc,brainspan}
+mkdir -p "$OUT"/{gmt,tf,constraint,disease,lr,hgnc,brainspan,string}
 MANIFEST="$OUT/MANIFEST.tsv"
 [[ -f "$MANIFEST" ]] || printf 'file\turl\tdownloaded_utc\tbytes\n' > "$MANIFEST"
 FAILED=()
@@ -38,6 +38,7 @@ fetch() {   # fetch <relative path> <url> [min bytes]
     echo "  have  $rel"
     return
   fi
+  mkdir -p "$(dirname "$dest")"
   if curl -sSL --fail --retry 3 --retry-delay 5 --max-time 1800 -o "$dest.part" "$url"; then
     local bytes; bytes=$(wc -c < "$dest.part" | tr -d ' ')
     if (( bytes >= min )); then
