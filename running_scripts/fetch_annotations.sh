@@ -84,6 +84,12 @@ if [[ -s "$OUT/brainspan/genes_matrix_csv.zip" && ! -s "$OUT/brainspan/expressio
     || { echo "  FAIL  unzip BrainSpan"; FAILED+=("brainspan unzip"); }
 fi
 
+echo "C7 STRING v12.0 human protein links (per-channel scores) and protein names (Spectra STRING prior)"
+STRING="https://stringdb-downloads.org/download"
+fetch string/9606.protein.links.detailed.v12.0.txt.gz \
+  "${STRING}/protein.links.detailed.v12.0/9606.protein.links.detailed.v12.0.txt.gz" 100000000
+fetch string/9606.protein.info.v12.0.txt.gz "${STRING}/protein.info.v12.0/9606.protein.info.v12.0.txt.gz" 1000000
+
 echo
 if (( ${#FAILED[@]} )); then
   echo "FAILED: ${FAILED[*]} -- rerun later; analyses that need them say so and skip"

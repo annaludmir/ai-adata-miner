@@ -135,8 +135,12 @@ factors against the 08 modules. List programmes reproduce their lists almost
 whole (the prior holds them together), so Spectra does not prune lists; the
 informative programmes for the lists are those of the core-prior fit (in the
 list-guided fit the lists dominate the global gene-gene graph, which pulls even
-the free factors into them). Next
-candidates: STRING-expanded priors and a data-driven comparison (scHPF / cNMF).
+the free factors into them). A third fit adds STRING network modules
+(experimental / curated-database edges only, no text mining) to the core prior;
+36 tests it the same way and asks which STRING modules are rich in NDD genes and
+also form a programme that replicates across chemistries and holds in held-out
+donors. Next
+candidate: a prior-free comparison (scHPF / cNMF).
 
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse

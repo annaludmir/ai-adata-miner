@@ -95,7 +95,7 @@ re-reads the matrix.
 
 Analyses 29-34 read GO / Reactome / KEGG gene sets, TF lists and targets, gnomAD
 constraint, HPO disease genes, ligand-receptor pairs, HGNC symbols and BrainSpan.
-Download them once, on the login node (light, ~0.4 GB, about two minutes):
+Download them once, on the login node (~0.55 GB with STRING, a few minutes):
 
 ```bash
 ./fetch_annotations.sh            # -> /miridan-data/annaludmir/aim_annotations, with MANIFEST.tsv
@@ -167,6 +167,21 @@ for ds in cortex human_dev; do for ch in v2 v3; do
 done; done
 ```
 
+**Third fit, STRING prior.** `SPECTRA_PRIOR=string` adds modules of the STRING
+v12 protein network to the core prior: edges with experimental or
+curated-database evidence >= 700 (no text mining, which would link genes merely
+co-mentioned with disease genes), the whole network split into Louvain modules
+of 10-100 genes and numbered once (`string:M007` is the same module in every
+stratum), each fit taking the 60 best covered by its genes. Needs the STRING
+files from `fetch_annotations.sh` (rerun it; files already present are kept).
+Results in `25_spectra_string/`, with `string_modules.csv`:
+
+```bash
+for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch,SKIP_INPUT=true,SPECTRA_PRIOR=string slurm_spectra.sh
+done; done
+```
+
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
 
@@ -175,7 +190,7 @@ srun --account=miridan-users_v2 --partition=power-general-public-pool --qos=publ
   /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python scripts_generated/25_spectra_fit.py --rescore
 ```
 
-(add `--prior core` for the core-prior fits)
+(add `--prior core` or `--prior string` for those fits)
 Fit all four strata with the same settings. Rerun
 step 3 (or just analysis 36) afterwards.
 

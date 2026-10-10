@@ -22,6 +22,11 @@ factors (PRIORS), so the lists can be tested against programmes they did not
 shape: outputs go to 25_spectra_core/ and the work files get a _core suffix.
 (With --prior full the big lists dominate the global gene-gene graph, which
 every global factor -- free ones included -- is fitted to.)
+--prior string adds modules of the STRING protein network (string_modules():
+experimental / curated-database edges >= STRING_MIN, the whole network split
+into Louvain modules of 10-100 genes, numbered once; per fit the 60 best covered
+by its model genes) to the core prior: 25_spectra_string/, with
+string_modules.csv listing each module's genes and nearest GO term.
 Genes are matched to the subsample's symbols (case-insensitive, or by Ensembl
 id); sets need >= MIN_SET_GENES genes detected in the subsample.
 
@@ -62,7 +67,13 @@ SUFFIX = ""
 # --prior full: the gene lists and NDD seeds steer factors (25_spectra/). --prior core: only core
 # biology (GO processes, cell-cycle panels, class markers) with more free factors, so the NDD lists
 # can be tested against programmes they did not shape (25_spectra_core/, *_core work files).
-PRIORS = {"full": ("25_spectra", "", 5), "core": ("25_spectra_core", "_core", 15)}
+# --prior string: the core prior plus modules of the STRING protein network (experimental and
+# curated-database evidence only; no text mining, which links genes co-mentioned with disease genes).
+PRIORS = {"full": ("25_spectra", "", 5), "core": ("25_spectra_core", "_core", 15),
+          "string": ("25_spectra_string", "_string", 15)}
+STRING_MIN = 700                 # experimental or database channel score (0-1000): STRING's "high confidence"
+STRING_MODULE_SIZE = (10, 100)
+MAX_STRING_MODULES = 60
 CORE_GO = ["GO:0007411", "GO:0007416", "GO:0007268", "GO:0007219", "GO:0060070", "GO:0007224", "GO:0030509",
            "GO:0008543", "GO:0048384", "GO:0035329", "GO:0060271", "GO:0030198", "GO:0071456", "GO:0006986",
            "GO:0006096", "GO:0006695", "GO:0002181", "GO:0006120", "GO:0000398", "GO:0006338", "GO:0001764",
@@ -139,7 +150,72 @@ def plateau_train(plateau: int, rec: dict, rel_tol: float = 1e-4):
     return train
 
 
-def prior(a, core: bool = False) -> tuple[dict, pd.DataFrame]:
+def string_modules(vocab: list[str], go_terms: dict[str, list[str]]) -> tuple[dict, pd.DataFrame]:
+    """Modules of the human STRING network, as prior sets over the model's genes.
+
+    Edges: experimental or curated-database score >= STRING_MIN (text mining,
+    co-expression and the genomic-context channels left out). The whole network
+    is split into Louvain communities (fixed seed), and communities above
+    STRING_MODULE_SIZE[1] genes are split again until none is; modules are
+    numbered once for the whole network (by internal edge weight), so string:M007
+    is the same module in every stratum. Each fit takes the MAX_STRING_MODULES
+    modules with the most genes among its model genes (at least
+    STRING_MODULE_SIZE[0]), restricted to those genes, each annotated with the GO
+    BP term it overlaps most.
+    """
+    import networkx as nx
+    d = Path(config.ANNOTATIONS_DIR) / "string"
+    links, info = d / "9606.protein.links.detailed.v12.0.txt.gz", d / "9606.protein.info.v12.0.txt.gz"
+    if not (links.exists() and info.exists()):
+        log(f"  STRING files missing in {d} -- run fetch_annotations.sh; no STRING modules")
+        return {}, pd.DataFrame()
+    names = pd.read_csv(info, sep="\t", usecols=[0, 1])
+    # integer nodes: Louvain iterates over sets of nodes, and str hashing differs per process,
+    # so string nodes would make the communities change from run to run despite the seed
+    gene_of = list(names.iloc[:, 1].str.upper())
+    node = {pid: i for i, pid in enumerate(names.iloc[:, 0])}
+    G = nx.Graph()
+    G.add_nodes_from(range(len(gene_of)))
+    for ch in pd.read_csv(links, sep=" ", usecols=["protein1", "protein2", "experimental", "database"],
+                          chunksize=2_000_000):
+        score = ch[["experimental", "database"]].max(axis=1)
+        ch = ch[(score >= STRING_MIN) & (ch.protein1 < ch.protein2)]
+        G.add_weighted_edges_from(zip(ch.protein1.map(node), ch.protein2.map(node), score[ch.index] / 1000.0))
+    G.remove_nodes_from([n for n in list(G.nodes) if G.degree(n) == 0])
+    lo, hi = STRING_MODULE_SIZE
+
+    def split(nodes):
+        parts = nx.community.louvain_communities(G.subgraph(sorted(nodes)), weight="weight", seed=config.RANDOM_SEED)
+        if len(parts) == 1:
+            return [set(nodes)]
+        return [m for c in parts for m in (split(c) if len(c) > hi else [set(c)])]
+
+    comms = [m for c in nx.community.louvain_communities(G, weight="weight", seed=config.RANDOM_SEED)
+             for m in (split(c) if len(c) > hi else [set(c)])]
+    comms = sorted((c for c in comms if lo <= len(c) <= hi),
+                   key=lambda c: (-G.subgraph(c).size(weight="weight"), min(c)))
+    upper = {g.upper(): g for g in vocab}
+    cand = []
+    for i, c in enumerate(comms):
+        genes = sorted({upper[gene_of[n]] for n in c if gene_of[n] in upper})
+        if len(genes) >= lo:
+            cand.append((f"string:M{i + 1:03d}", len(c), genes))
+    cand.sort(key=lambda x: (-len(x[2]), x[0]))
+    log(f"  STRING: {G.number_of_nodes():,} proteins, {G.number_of_edges():,} edges (score >= {STRING_MIN}); "
+        f"{len(comms)} modules of {lo}-{hi} genes, {len(cand)} with >= {lo} model genes, "
+        f"keeping {min(len(cand), MAX_STRING_MODULES)}")
+    terms = {t: set(g) for t, g in go_terms.items() if 10 <= len(g) <= 300}
+    mods, rows = {}, []
+    for name, size, genes in sorted(cand[:MAX_STRING_MODULES]):
+        gs = set(genes)
+        best = max(terms.items(), key=lambda kv: len(gs & kv[1]) / min(len(gs), len(kv[1])), default=("", set()))
+        mods[name] = genes
+        rows.append({"module": name, "network_genes": size, "n_genes": len(genes), "best_go_term": best[0],
+                     "go_overlap": len(gs & best[1]) / min(len(gs), max(len(best[1]), 1)), "genes": "|".join(genes)})
+    return mods, pd.DataFrame(rows)
+
+
+def prior(a, core: bool = False, string: bool = False) -> tuple[dict, pd.DataFrame, pd.DataFrame]:
     upper = {g.upper(): g for g in a.var_names}
     acc = {str(x).split(".")[0]: g for x, g in zip(a.var["accession"], a.var_names)} if "accession" in a.var else {}
 
@@ -162,9 +238,11 @@ def prior(a, core: bool = False) -> tuple[dict, pd.DataFrame]:
             if len(m) >= MIN_SET_GENES:
                 glob[f"{prefix}:{name}"] = m
     gmt = Path(config.ANNOTATIONS_DIR) / "gmt" / "GO_Biological_Process_2023.gmt"
+    go_terms = {}
     if gmt.exists():
         for line in gmt.read_text().splitlines():
             parts = line.split("\t")
+            go_terms[parts[0].split(" (GO:")[0]] = parts[2:]
             go = next((g for g in CORE_GO if f"({g})" in parts[0]), None)
             if go:
                 m = mapped(parts[2:])
@@ -185,7 +263,17 @@ def prior(a, core: bool = False) -> tuple[dict, pd.DataFrame]:
                 rows.append({"scope": c, "set": f"marker:{panel}", "n_input": len(markers[panel]), "n_found": len(m)})
                 if len(m) >= MIN_SET_GENES:
                     gsd[c][f"marker:{panel}"] = m
-    return gsd, pd.DataFrame(rows)
+    modules = pd.DataFrame()
+    if string:
+        # STRING modules among the genes the model would use anyway (highly variable + core sets),
+        # so the network adds structure without pulling in thousands of extra genes
+        vocab = set(a.var_names[a.var["highly_variable"].to_numpy(bool)])
+        vocab |= {g for v in gsd.values() for genes in v.values() for g in genes}
+        mods, modules = string_modules(sorted(vocab), {t: mapped(g) for t, g in go_terms.items()})
+        for name, genes in mods.items():
+            rows.append({"scope": "global", "set": name, "n_input": len(genes), "n_found": len(genes)})
+            glob[name] = genes
+    return gsd, pd.DataFrame(rows), modules
 
 
 def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
@@ -204,7 +292,10 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     np.random.seed(config.RANDOM_SEED)
     a = ad.read_h5ad(work / "input.h5ad")
     a.obs["cell_class"] = a.obs["cell_class"].astype(str)
-    gsd, sets = prior(a, core=args.prior == "core")
+    gsd, sets, modules = prior(a, core=args.prior in ("core", "string"), string=args.prior == "string")
+    if len(modules):
+        man.write(modules, "string_modules", "STRING modules used as prior sets: genes, internal edge weight, "
+                  "best GO BP term", subdir=SUBDIR)
     # Spectra (0.2.1) indexes .X with a pandas mask, which current scipy rejects for sparse
     # matrices, and densifies it anyway: hand it a dense matrix restricted to the genes it uses
     # (highly variable + every prior-set gene).
@@ -358,7 +449,8 @@ def main() -> None:
     p.add_argument("--lam", type=float, default=0.01,
                    help="weight of the expression term against the prior graph (Spectra's lam; larger = data count more)")
     p.add_argument("--prior", choices=list(PRIORS), default=os.environ.get("SPECTRA_PRIOR", "full"),
-                   help="full: lists + NDD seeds + core biology; core: core biology only, more free factors")
+                   help="full: lists + NDD seeds + core biology; core: core biology only, more free factors; "
+                        "string: core + STRING network modules")
     p.add_argument("--plateau", type=int, default=int(os.environ.get("SPECTRA_PLATEAU", 50)),
                    help="cpu backend: lower the learning rate after this many epochs without a new best loss; "
                         "0 = Spectra's own training rule")

@@ -31,6 +31,7 @@
 #          --export=ALL,DATASET=human_dev,CHEMISTRY=v2,SPECTRA_BACKEND=gpu slurm_spectra.sh
 # Refit without redrawing the subsample: SKIP_INPUT=true
 # Core-prior fit (no gene lists / NDD seeds in the prior; -> 25_spectra_core/): SPECTRA_PRIOR=core
+# STRING-prior fit (core prior + STRING network modules; -> 25_spectra_string/): SPECTRA_PRIOR=string
 
 set -uo pipefail
 

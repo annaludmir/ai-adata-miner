@@ -32,12 +32,16 @@ Method
      gene's level x spread bin in the same chemistry's clusters (exact
      Poisson-binomial p); a steered factor's own prior-set genes are left out;
      BH per dataset; replicated when q < 0.05 for both factors of a v2 / v3 pair;
-     the pair's held-out support and age trend are reported with it.
+     the pair's held-out support and age trend are reported with it. The same
+     for a third fit (SPECTRA_PRIOR=string: core prior + STRING network modules;
+     a module-steered factor's module genes are left out), plus each STRING
+     module's own NDD content (vs the expression-matched expectation) next to
+     whether its programme replicates v2 / v3 and holds in held-out donors.
   E2. For list-labelled factor pairs, genes added in both fits and
      list genes kept in both (weight above the 95th percentile of non-list genes
      in the factor) and dropped in both (weight at or below their median).
 
-Inputs: csv_exports/<ds>__<chem>/25_spectra/* and 25_spectra_core/*; cluster pseudobulks (07/08 rules);
+Inputs: csv_exports/<ds>__<chem>/25_spectra/*, 25_spectra_core/*, 25_spectra_string/*; cluster pseudobulks (07/08 rules);
 GO BP gene sets (annotations)
 """
 from __future__ import annotations
@@ -63,7 +67,9 @@ MIN_SCORE_CELLS = 20
 N_FREE_GLOBAL = 5        # free factors per scope, as script 25 sets them (N_NEW_GLOBAL; +1 per class)
 N_FREE_CLASS = 1
 MIN_SET_GENES = 10
-CORE_SUB = "25_spectra_core"
+# the fits whose prior holds no NDD set: (export subfolder, output-file prefix, name in the summary)
+VARIANTS = {"core": ("25_spectra_core", "core", "Core-prior fit"),
+            "string": ("25_spectra_string", "string", "STRING-prior fit")}
 MAX_LISTED = 10
 
 
@@ -265,15 +271,62 @@ def combine_ages(pairs: pd.DataFrame, ages: pd.DataFrame) -> pd.DataFrame:
                                  carry=("rho_vs_age",))
 
 
-def core_section(out: C.Output, rng: np.random.Generator) -> list[str]:
-    """The core-prior fit (no NDD set in the prior): which of its programmes carry the NDD lists?"""
-    fits = {(ds, chem): load(C.ns(ds, chem), out, CORE_SUB) for ds, chem in C.STRATA}
+def string_module_sets(ds: str, sub: str, out: C.Output) -> tuple[dict, dict]:
+    """STRING modules of a dataset's fits: {name: genes (union over strata)}, {name: nearest GO term}."""
+    genes, go = {}, {}
+    for chem in C.CHEMISTRIES:
+        p = C.EXPORTS / C.ns(ds, chem) / sub / "string_modules.csv"
+        if p.exists():
+            out.used(f"{C.ns(ds, chem)}/{sub}/string_modules.csv")
+            for r in pd.read_csv(p).itertuples():
+                genes.setdefault(r.module, set()).update(str(r.genes).split("|"))
+                go[r.module] = r.best_go_term
+    return genes, go
+
+
+def module_ndd_content(modules: dict, sets: dict, lc: pd.DataFrame) -> pd.DataFrame:
+    """NDD set genes in each STRING module vs the expression-matched expectation (exact p)."""
+    genes = list(lc.index)
+    pos = {g: i for i, g in enumerate(genes)}
+    bins = C.expression_bins(lc)
+    rows = []
+    for m, mg in modules.items():
+        mask = np.zeros(len(genes), bool)
+        mask[[pos[g] for g in mg if g in pos]] = True
+        if mask.sum() < MIN_SET_GENES:
+            continue
+        rate = pd.Series(mask).groupby(bins).mean()
+        for name, members in sets.items():
+            idx = np.array(sorted(pos[g] for g in members if g in pos))
+            if idx.size < MIN_SET_GENES:
+                continue
+            probs = rate.reindex(bins[idx]).to_numpy(float)
+            k, exp = int(mask[idx].sum()), float(probs.sum())
+            rows.append({"module": m, "module_genes": int(mask.sum()), "gene_set": name, "in_module": k,
+                         "expected": exp, "fold": k / exp if exp > 0 else np.nan, "p": C.poisson_binomial_sf(probs, k),
+                         "genes": "|".join(genes[i] for i in idx if mask[i])})
+    return pd.DataFrame(rows)
+
+
+def core_section(out: C.Output, rng: np.random.Generator, variant: str = "core") -> list[str]:
+    """A fit whose prior holds no NDD set: which of its programmes carry the NDD lists?"""
+    sub, prefix, title = VARIANTS[variant]
+    fits = {(ds, chem): load(C.ns(ds, chem), out, sub) for ds, chem in C.STRATA}
     if all(v is None for v in fits.values()):
-        return ["**Core-prior fit** (NDD lists left out of the prior, to test them against programmes they did not "
-                "shape): not run yet -- slurm_spectra.sh with SPECTRA_PRIOR=core."]
-    overview, support, enrich, pairs, ages = [], [], [], [], []
+        return [f"**{title}** (no NDD set in the prior, to test the lists against programmes they did not shape): "
+                f"not run yet -- slurm_spectra.sh with SPECTRA_PRIOR={variant}."]
+    overview, support, enrich, pairs, ages, modnd = [], [], [], [], [], []
+    mod_go = {}
     for ds in C.DATASETS:
         sets, steer = ndd_sets_for(ds, out), steering_sets(ds, out)
+        if variant == "string":
+            mods, go = string_module_sets(ds, sub, out)
+            steer.update(mods)
+            mod_go.update({(ds, m): t for m, t in go.items()})
+            lc_v2, _ = C.cluster_expression(C.ns(ds, "v2"))
+            md = module_ndd_content(mods, sets, lc_v2)
+            if len(md):
+                modnd.append(md.assign(dataset=ds))
         for chem in C.CHEMISTRIES:
             fit = fits.get((ds, chem))
             if fit is None:
@@ -318,19 +371,20 @@ def core_section(out: C.Output, rng: np.random.Generator) -> list[str]:
                                                               - {""}))})
         erep = pd.DataFrame(rows)
         acomb = combine_ages(pairs, ages) if len(ages) else pd.DataFrame()
-    out.write(overview, "core_factors", "Core-prior fit: per stratum x factor (scope, label, free, top genes)")
-    out.write(pairs, "core_factor_pairs_v2_v3", "Core-prior fit: mutual-best v2 / v3 factor pairs")
-    out.write(support, "core_held_out_support", "Core-prior fit: top-gene coherence in the other chemistry's clusters")
-    out.write(enrich, "core_ndd_enrichment", f"Core-prior fit: per factor x NDD set, set genes among the top {N_TOP} "
+    out.write(overview, f"{prefix}_factors", f"{title}: per stratum x factor (scope, label, free, top genes)")
+    out.write(pairs, f"{prefix}_factor_pairs_v2_v3", f"{title}: mutual-best v2 / v3 factor pairs")
+    out.write(support, f"{prefix}_held_out_support", f"{title}: top-gene coherence in the other chemistry's clusters")
+    out.write(enrich, f"{prefix}_ndd_enrichment", f"{title}: per factor x NDD set, set genes among the top {N_TOP} "
               "vs the expression-matched expectation; exact p, BH")
-    out.write(erep, "core_ndd_enrichment_replicated", "Core-prior fit: per v2 / v3 pair x NDD set")
-    out.write(acomb, "core_factor_age_trends_combined", "Core-prior fit: per pair x class x region (or pooled): "
+    out.write(erep, f"{prefix}_ndd_enrichment_replicated", f"{title}: per v2 / v3 pair x NDD set")
+    out.write(acomb, f"{prefix}_factor_age_trends_combined", f"{title}: per pair x class x region (or pooled): "
               "age trend, v2 x v3 combined")
 
     f = []
     ok = support[(support.q < 0.05) & (support.effect_vs_null_sd > 0)]
-    f.append("**Core-prior fit** (GO processes, cell-cycle panels and class markers only, more free factors; the NDD "
-             "lists are tested against programmes they did not shape): " + "; ".join(
+    what = {"core": "GO processes, cell-cycle panels and class markers only, more free factors",
+            "string": "the core prior plus STRING network modules (experimental / database evidence)"}[variant]
+    f.append(f"**{title}** ({what}; the NDD lists are tested against programmes they did not shape): " + "; ".join(
                  f"{ds} {ch}: {len(g)} factors ({int(g.free.sum())} free), "
                  f"{len(ok[(ok.dataset == ds) & (ok.chemistry == ch)])} supported in the other chemistry's donors"
                  for (ds, ch), g in overview.groupby(["dataset", "chemistry"])) + "; v2 / v3 pairs: "
@@ -357,11 +411,39 @@ def core_section(out: C.Output, rng: np.random.Generator) -> list[str]:
                              f"{sup.get((ds, 'v2', f2_), np.nan):+.0f}/{sup.get((ds, 'v3', f3_), np.nan):+.0f} SD{trend}): "
                              + ", ".join(f"{x.gene_set} x{x.fold_v2:.1f}/x{x.fold_v3:.1f}" for x in g.itertuples())
                              + f" [{', '.join(str(g.iloc[0].genes_in_both).split('|')[:10])}]")
-            f.append(f"**Programmes carrying NDD genes, in both chemistries** (core-prior fit; set genes among the top "
+            f.append(f"**Programmes carrying NDD genes, in both chemistries** ({title.lower()}; set genes among the top "
                      f"{N_TOP} vs the expression-matched expectation -- for a steered programme, genes of its own prior "
                      "set left out -- q < 0.05 in v2 and v3; fold v2/v3; shared NDD genes): " + "; ".join(parts[:MAX_LISTED * 2]) + ".")
         else:
-            f.append("**Programmes carrying NDD genes, in both chemistries** (core-prior fit): none.")
+            f.append(f"**Programmes carrying NDD genes, in both chemistries** ({title.lower()}): none.")
+    if modnd:
+        modnd = pd.concat(modnd, ignore_index=True)
+        modnd["q"] = np.nan
+        for _, ix in modnd.groupby("dataset").groups.items():
+            modnd.loc[ix, "q"] = C.bh(modnd.loc[ix, "p"])
+        # a module's programme replicates when both fits hold a factor labelled with it, paired v2 / v3
+        rep_mods = {}
+        for p in pairs.itertuples():
+            if str(p.label_v2).startswith("string:") and p.label_v2 == p.label_v3:
+                s2 = support[(support.dataset == p.dataset) & (support.chemistry == "v2") & (support.factor == p.factor_v2)]
+                s3 = support[(support.dataset == p.dataset) & (support.chemistry == "v3") & (support.factor == p.factor_v3)]
+                ok2 = bool(len(s2) and s2.q.iloc[0] < 0.05 and s2.effect_vs_null_sd.iloc[0] > 0)
+                ok3 = bool(len(s3) and s3.q.iloc[0] < 0.05 and s3.effect_vs_null_sd.iloc[0] > 0)
+                rep_mods[(p.dataset, p.label_v2)] = (f"{p.factor_v2}~{p.factor_v3}", ok2 and ok3)
+        modnd["programme_pair"] = [rep_mods.get((r.dataset, r.module), ("", False))[0] for r in modnd.itertuples()]
+        modnd["programme_supported"] = [rep_mods.get((r.dataset, r.module), ("", False))[1] for r in modnd.itertuples()]
+        modnd["best_go_term"] = [mod_go.get((r.dataset, r.module), "") for r in modnd.itertuples()]
+        out.write(modnd, f"{prefix}_module_ndd_content", "Per STRING module x NDD set: set genes in the module vs the "
+                  "expression-matched expectation; whether the module's programme replicates v2 / v3 and is supported "
+                  "in held-out donors")
+        n_rep = sum(1 for v in rep_mods.values() if v[1])
+        hit = modnd[(modnd.q < 0.05) & modnd.programme_supported].sort_values("p")
+        f.append(f"**STRING modules rich in NDD genes that form a replicated programme** ({len(rep_mods)} module "
+                 f"programmes paired v2 / v3, {n_rep} also supported in held-out donors; NDD genes in the module vs the "
+                 "expression-matched expectation, q < 0.05): " + ("; ".join(
+                     f"{r.dataset} {r.module} ({r.best_go_term}; {r.programme_pair}) {r.gene_set} x{r.fold:.1f} "
+                     f"[{', '.join(str(r.genes).split('|')[:8])}]" for r in hit.head(MAX_LISTED * 2).itertuples())
+                     or "none") + ".")
     return f
 
 
@@ -508,7 +590,8 @@ def main() -> None:
                  f"programmes {kept:.0%} of list genes outweigh 95% of non-list genes in both fits. At lam = 0.01 the "
                  "prior holds the whole list together, so Spectra does not prune the lists; whether a list coheres in "
                  "the data is what the held-out test above (and 07) measures (list_refinement.csv has the details).")
-    f.extend(core_section(out, rng))
+    f.extend(core_section(out, rng, "core"))
+    f.extend(core_section(out, rng, "string"))
     if "best_08_module_overlap" in overview:
         nm = overview[(overview.label == "new") & (overview.best_08_module_overlap < 0.2)]
         f.append(f"**New programmes vs the 08 co-expression modules**: {int((overview.label == 'new').sum())} new "
@@ -577,7 +660,7 @@ def main() -> None:
          "age points can rest on a few dozen cells.",
          "The gpu backend (Spectra_gpu, minibatched) is marked by its authors as in development; the cpu backend is "
          "the published model."],
-        ["Compare with scHPF or cNMF (data-driven programmes) and with STRING-expanded priors."])
+        ["Compare with scHPF or cNMF (programmes fitted without any prior)."])
 
 
 if __name__ == "__main__":
