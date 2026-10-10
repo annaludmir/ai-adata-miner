@@ -24,15 +24,21 @@ Method
      with age per class (>= 5 ages), exact permutation; replicated factor pairs
      combined across chemistries (signed Stouffer, BH, tiered); pooled over
      regions and within each region (human_dev's sampled regions differ by age).
-  E. NDD lists in data-driven programmes (the free factors, fitted without a
-     prior set): list genes among the top 50 vs the expectation from each gene's
-     level x spread bin in the same chemistry's clusters, exact Poisson-binomial p;
-     BH per dataset; replicated when q < 0.05 for both factors of a v2 / v3 pair.
+  E. NDD lists vs programmes they did not shape: a second fit (SPECTRA_PRIOR=
+     core: GO processes, cell-cycle panels, class markers, 15 free global
+     factors; no NDD set) -- in the full fit the big lists dominate the global
+     gene-gene graph that every global factor, free ones too, is fitted to. Per
+     core factor: NDD set genes among its top 50 vs the expectation from each
+     gene's level x spread bin in the same chemistry's clusters (exact
+     Poisson-binomial p); a steered factor's own prior-set genes are left out;
+     BH per dataset; replicated when q < 0.05 for both factors of a v2 / v3 pair;
+     the pair's held-out support and age trend are reported with it.
   E2. For list-labelled factor pairs, genes added in both fits and
      list genes kept in both (weight above the 95th percentile of non-list genes
      in the factor) and dropped in both (weight at or below their median).
 
-Inputs: csv_exports/<ds>__<chem>/25_spectra/*; cluster pseudobulks (07/08 rules)
+Inputs: csv_exports/<ds>__<chem>/25_spectra/* and 25_spectra_core/*; cluster pseudobulks (07/08 rules);
+GO BP gene sets (annotations)
 """
 from __future__ import annotations
 
@@ -57,15 +63,16 @@ MIN_SCORE_CELLS = 20
 N_FREE_GLOBAL = 5        # free factors per scope, as script 25 sets them (N_NEW_GLOBAL; +1 per class)
 N_FREE_CLASS = 1
 MIN_SET_GENES = 10
+CORE_SUB = "25_spectra_core"
 MAX_LISTED = 10
 
 
-def load(n: str, out: C.Output):
-    base = C.EXPORTS / n / "25_spectra"
+def load(n: str, out: C.Output, sub: str = "25_spectra"):
+    base = C.EXPORTS / n / sub
     if not (base / "factor_info.csv").exists():
         return None
     for f in ("factor_info", "factor_gene_weights", "factor_scores_by_group", "prior_sets"):
-        out.used(f"{n}/25_spectra/{f}.csv")
+        out.used(f"{n}/{sub}/{f}.csv")
     info = pd.read_csv(base / "factor_info.csv").set_index("factor")
     w = pd.read_csv(base / "factor_gene_weights.csv").set_index("factor")
     scores = pd.read_csv(base / "factor_scores_by_group.csv")
@@ -158,6 +165,8 @@ def free_factors(info: pd.DataFrame) -> pd.Series:
     factors that drifted from their set are not free: their NDD content may come
     from the set that seeded them.
     """
+    if "free" in info:                         # written by script 25 since the core prior
+        return info["free"].astype(bool)
     free = pd.Series(False, index=info.index)
     for scope, g in info.groupby("scope", sort=False):
         n = N_FREE_GLOBAL if scope == "global" else N_FREE_CLASS
@@ -165,8 +174,16 @@ def free_factors(info: pd.DataFrame) -> pd.Series:
     return free
 
 
-def ndd_enrichment(info: pd.DataFrame, w: pd.DataFrame, sets: dict, lc: pd.DataFrame) -> pd.DataFrame:
-    """NDD sets among the top genes of the free factors, against expression-matched expectation.
+def ndd_enrichment(info: pd.DataFrame, w: pd.DataFrame, sets: dict, lc: pd.DataFrame,
+                   steering: dict | None = None) -> pd.DataFrame:
+    """NDD sets among the top genes of every factor, against expression-matched expectation.
+
+    Meant for the core-prior fit, whose prior holds no NDD set, so no factor was
+    steered towards one (in the full fit the lists dominate the global graph that
+    every global factor, free ones included, is fitted to). A steered factor
+    shares genes with its own prior set (the synapse GO set holds synaptic NDD
+    genes, say), so for a factor that is not free, the genes of the prior set it
+    matches (steering[label]) are left out of the NDD set and the background.
 
     NDD genes are long and highly expressed in neurons, so each set gene's chance
     of being a top gene is the top-gene share of its level x spread bin across the
@@ -177,22 +194,175 @@ def ndd_enrichment(info: pd.DataFrame, w: pd.DataFrame, sets: dict, lc: pd.DataF
     pos = {g: i for i, g in enumerate(genes)}
     bins = C.expression_bins(lc.loc[genes])
     rows = []
-    for f in info.index[free_factors(info)]:
+    free = free_factors(info)
+    steering = steering or {}
+    for f in info.index:
         top = w.loc[f, genes].nlargest(N_TOP).index
         mask = np.zeros(len(genes), bool)
         mask[[pos[g] for g in top]] = True
-        rate = pd.Series(mask).groupby(bins).mean()
+        drop = set() if free[f] else {g.upper() for g in steering.get(info.loc[f, "label"], ())}
+        keep = np.array([g.upper() not in drop for g in genes])
+        rate = pd.Series(mask[keep]).groupby(bins[keep]).mean()
         for name, members in sets.items():
-            idx = np.array(sorted(pos[g] for g in members if g in pos))
+            idx = np.array(sorted(pos[g] for g in members if g in pos and g.upper() not in drop))
             if idx.size < MIN_SET_GENES:
                 continue
             probs = rate.reindex(bins[idx]).to_numpy(float)
             k, exp = int(mask[idx].sum()), float(probs.sum())
             rows.append({"factor": f, "scope": info.loc[f, "scope"], "label": info.loc[f, "label"],
-                         "gene_set": name, "set_genes": idx.size, "in_top": k, "expected": exp,
+                         "free": bool(free[f]), "gene_set": name, "prior_genes_left_out": len(drop), "set_genes": idx.size, "in_top": k, "expected": exp,
                          "fold": k / exp if exp > 0 else np.nan, "p": C.poisson_binomial_sf(probs, k),
                          "genes": "|".join(g for g in top if g in members)})
     return pd.DataFrame(rows)
+
+
+def labelled_pairs(f2, f3, ds: str) -> pd.DataFrame:
+    p = pair_factors(f2[1], f3[1])
+    for chem, fit in (("v2", f2), ("v3", f3)):
+        p[f"label_{chem}"] = p[f"factor_{chem}"].map(fit[0].label)
+        p[f"scope_{chem}"] = p[f"factor_{chem}"].map(fit[0].scope)
+    return p.assign(dataset=ds)
+
+
+def ndd_sets_for(ds: str, out: C.Output) -> dict:
+    """User lists (uncollapsed) and seed NDD panels."""
+    sets = {f"list:{k}": set(v) for k, v in C.mapped_lists(ds, collapse=False).items()}
+    pan = C.panels(C.ns(ds, "v2"))
+    out.used(f"{C.ns(ds, 'v2')}/11_panels/panel_coverage.csv")
+    for pname, g in pan[pan.panel_group == "ndd"].groupby("panel"):
+        sets[f"seed:{pname}"] = set(g.gene)
+    return sets
+
+
+def steering_sets(ds: str, out: C.Output) -> dict:
+    """The core prior's sets by label (go:, seed: cell cycle, marker:), as script 25 names them."""
+    sets = {}
+    gmt = C.annotation("gmt/GO_Biological_Process_2023.gmt")
+    if gmt is not None:
+        out.used("annotations/gmt/GO_Biological_Process_2023.gmt")
+        for term, genes in C.read_gmt(gmt).items():
+            sets["go:" + term.split(" (GO:")[0]] = set(genes)
+    pan = C.panels(C.ns(ds, "v2"))
+    for (grp, pname), g in pan[pan.panel_group.isin(["cell_cycle", "marker"])].groupby(["panel_group", "panel"]):
+        sets[f"{'marker' if grp == 'marker' else 'seed'}:{pname}"] = set(g.gene)
+    return sets
+
+
+def combine_ages(pairs: pd.DataFrame, ages: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    for p in pairs.itertuples():
+        for chem, f in (("v2", p.factor_v2), ("v3", p.factor_v3)):
+            a = ages[(ages.dataset == p.dataset) & (ages.chemistry == chem) & (ages.factor == f)]
+            for r in a.itertuples():
+                rows.append({"dataset": p.dataset, "pair": f"{p.factor_v2}~{p.factor_v3}",
+                             "label": p.label_v2 if p.label_v2 == p.label_v3 else f"{p.label_v2} / {p.label_v3}",
+                             "scope": p.scope_v2, "cell_class": r.cell_class, "region": r.region,
+                             "chemistry": chem, "rho_vs_age": r.rho_vs_age, "perm_p": r.perm_p, "n_ages": r.n_ages})
+    if not rows:
+        return pd.DataFrame()
+    return C.combine_chemistries(pd.DataFrame(rows), ["dataset", "pair", "label", "scope", "cell_class", "region"],
+                                 effect="rho_vs_age", weight="n_ages", labels=("rises with age", "falls with age"),
+                                 carry=("rho_vs_age",))
+
+
+def core_section(out: C.Output, rng: np.random.Generator) -> list[str]:
+    """The core-prior fit (no NDD set in the prior): which of its programmes carry the NDD lists?"""
+    fits = {(ds, chem): load(C.ns(ds, chem), out, CORE_SUB) for ds, chem in C.STRATA}
+    if all(v is None for v in fits.values()):
+        return ["**Core-prior fit** (NDD lists left out of the prior, to test them against programmes they did not "
+                "shape): not run yet -- slurm_spectra.sh with SPECTRA_PRIOR=core."]
+    overview, support, enrich, pairs, ages = [], [], [], [], []
+    for ds in C.DATASETS:
+        sets, steer = ndd_sets_for(ds, out), steering_sets(ds, out)
+        for chem in C.CHEMISTRIES:
+            fit = fits.get((ds, chem))
+            if fit is None:
+                continue
+            info, w, scores, _ = fit
+            overview.append(info.reset_index().assign(dataset=ds, chemistry=chem, free=free_factors(info).to_numpy()))
+            other = "v3" if chem == "v2" else "v2"
+            lc_other, _ = C.cluster_expression(C.ns(ds, other))
+            support.append(held_out(info, w, {}, lc_other, rng).assign(dataset=ds, chemistry=chem))
+            lc_own, _ = C.cluster_expression(C.ns(ds, chem))
+            e = ndd_enrichment(info, w, sets, lc_own, steer)
+            if len(e):
+                enrich.append(e.assign(dataset=ds, chemistry=chem))
+            a = age_trends(scores, ds)
+            if len(a):
+                ages.append(a.assign(dataset=ds, chemistry=chem))
+        if fits.get((ds, "v2")) is not None and fits.get((ds, "v3")) is not None:
+            pairs.append(labelled_pairs(fits[(ds, "v2")], fits[(ds, "v3")], ds))
+    overview = pd.concat(overview, ignore_index=True)
+    support = pd.concat(support, ignore_index=True)
+    support["q"] = C.bh(support.perm_p)
+    pairs = pd.concat(pairs, ignore_index=True) if pairs else pd.DataFrame()
+    enrich = pd.concat(enrich, ignore_index=True) if enrich else pd.DataFrame()
+    ages = pd.concat(ages, ignore_index=True) if ages else pd.DataFrame()
+    erep, acomb = pd.DataFrame(), pd.DataFrame()
+    if len(enrich):
+        enrich["q"] = np.nan
+        for _, ix in enrich.groupby("dataset").groups.items():
+            enrich.loc[ix, "q"] = C.bh(enrich.loc[ix, "p"])
+    if len(enrich) and len(pairs):
+        rows = []
+        for p in pairs.itertuples():
+            e2 = enrich[(enrich.dataset == p.dataset) & (enrich.chemistry == "v2") & (enrich.factor == p.factor_v2)]
+            e3 = enrich[(enrich.dataset == p.dataset) & (enrich.chemistry == "v3") & (enrich.factor == p.factor_v3)]
+            for r in e2.merge(e3, on="gene_set", suffixes=("_v2", "_v3")).itertuples():
+                rows.append({"dataset": p.dataset, "pair": f"{p.factor_v2}~{p.factor_v3}", "scope": p.scope_v2,
+                             "label_v2": p.label_v2, "label_v3": p.label_v3, "free": bool(r.free_v2 and r.free_v3),
+                             "cosine": p.cosine, "gene_set": r.gene_set, "in_top_v2": r.in_top_v2,
+                             "in_top_v3": r.in_top_v3, "fold_v2": r.fold_v2, "fold_v3": r.fold_v3,
+                             "q_v2": r.q_v2, "q_v3": r.q_v3, "replicated": bool(r.q_v2 < 0.05 and r.q_v3 < 0.05),
+                             "genes_in_both": "|".join(sorted(set(r.genes_v2.split("|")) & set(r.genes_v3.split("|"))
+                                                              - {""}))})
+        erep = pd.DataFrame(rows)
+        acomb = combine_ages(pairs, ages) if len(ages) else pd.DataFrame()
+    out.write(overview, "core_factors", "Core-prior fit: per stratum x factor (scope, label, free, top genes)")
+    out.write(pairs, "core_factor_pairs_v2_v3", "Core-prior fit: mutual-best v2 / v3 factor pairs")
+    out.write(support, "core_held_out_support", "Core-prior fit: top-gene coherence in the other chemistry's clusters")
+    out.write(enrich, "core_ndd_enrichment", f"Core-prior fit: per factor x NDD set, set genes among the top {N_TOP} "
+              "vs the expression-matched expectation; exact p, BH")
+    out.write(erep, "core_ndd_enrichment_replicated", "Core-prior fit: per v2 / v3 pair x NDD set")
+    out.write(acomb, "core_factor_age_trends_combined", "Core-prior fit: per pair x class x region (or pooled): "
+              "age trend, v2 x v3 combined")
+
+    f = []
+    ok = support[(support.q < 0.05) & (support.effect_vs_null_sd > 0)]
+    f.append("**Core-prior fit** (GO processes, cell-cycle panels and class markers only, more free factors; the NDD "
+             "lists are tested against programmes they did not shape): " + "; ".join(
+                 f"{ds} {ch}: {len(g)} factors ({int(g.free.sum())} free), "
+                 f"{len(ok[(ok.dataset == ds) & (ok.chemistry == ch)])} supported in the other chemistry's donors"
+                 for (ds, ch), g in overview.groupby(["dataset", "chemistry"])) + "; v2 / v3 pairs: "
+             + ", ".join(f"{ds} {len(g)}" for ds, g in pairs.groupby("dataset")) + ".")
+    if len(erep):
+        rp = erep[erep.replicated].copy()
+        lead = {(r.dataset, r.factor): ", ".join(str(r.top_genes).split("|")[:5])
+                for r in overview[overview.chemistry == "v2"].itertuples()}
+        sup = {(r.dataset, r.chemistry, r.factor): r.effect_vs_null_sd for r in support.itertuples()}
+        if len(rp):
+            rp["fmin"] = rp[["fold_v2", "fold_v3"]].min(axis=1)
+            parts = []
+            for (ds, pair), g in rp.sort_values("fmin", ascending=False).groupby(["dataset", "pair"], sort=False):
+                r0 = g.iloc[0]
+                f2_, f3_ = pair.split("~")
+                kind = "free" if r0.free else r0.label_v2
+                trend = ""
+                if len(acomb):
+                    t = acomb[(acomb.dataset == ds) & (acomb.pair == pair) & (acomb.tier.fillna("") != "")]
+                    if len(t):
+                        t = t.sort_values("combined_p").iloc[0]
+                        trend = f"; activity {t.direction} in {t.region} {t.cell_class} ({t.tier})"
+                parts.append(f"{ds} {pair} ({r0.scope}, {kind}; top {lead.get((ds, f2_), '')}; held-out "
+                             f"{sup.get((ds, 'v2', f2_), np.nan):+.0f}/{sup.get((ds, 'v3', f3_), np.nan):+.0f} SD{trend}): "
+                             + ", ".join(f"{x.gene_set} x{x.fold_v2:.1f}/x{x.fold_v3:.1f}" for x in g.itertuples())
+                             + f" [{', '.join(str(g.iloc[0].genes_in_both).split('|')[:10])}]")
+            f.append(f"**Programmes carrying NDD genes, in both chemistries** (core-prior fit; set genes among the top "
+                     f"{N_TOP} vs the expression-matched expectation -- for a steered programme, genes of its own prior "
+                     "set left out -- q < 0.05 in v2 and v3; fold v2/v3; shared NDD genes): " + "; ".join(parts[:MAX_LISTED * 2]) + ".")
+        else:
+            f.append("**Programmes carrying NDD genes, in both chemistries** (core-prior fit): none.")
+    return f
 
 
 def main() -> None:
@@ -206,7 +376,7 @@ def main() -> None:
                     ["**Not run**: fit Spectra first (slurm_spectra.sh per dataset x chemistry), then rerun step 3."],
                     [], [])
         return
-    overview, pairs_all, support, ages, refine, enrich = [], [], [], [], [], []
+    overview, pairs_all, support, ages, refine = [], [], [], [], []
     tops = {}
     for ds in C.DATASETS:
         f2, f3 = fits.get((ds, "v2")), fits.get((ds, "v3"))
@@ -233,21 +403,9 @@ def main() -> None:
             a = age_trends(scores, ds)
             if len(a):
                 ages.append(a.assign(dataset=ds, chemistry=chem))
-            own, _ = C.cluster_expression(C.ns(ds, chem))
-            out.used(f"{C.ns(ds, chem)}/09_pseudobulk/{C.COEXPR_GROUPING[ds]}__pseudobulk_counts.csv")
-            ndd_sets = {k: v for k, v in prior_genes.items() if k.startswith("list:")}
-            for pname, g in pan[pan.panel_group == "ndd"].groupby("panel"):
-                ndd_sets[f"seed:{pname}"] = set(g.gene)
-            e = ndd_enrichment(info, w, ndd_sets, own)
-            if len(e):
-                enrich.append(e.assign(dataset=ds, chemistry=chem))
         if f2 is not None and f3 is not None:
-            p = pair_factors(f2[1], f3[1])
-            p["label_v2"] = p.factor_v2.map(f2[0].label)
-            p["label_v3"] = p.factor_v3.map(f3[0].label)
-            p["scope_v2"] = p.factor_v2.map(f2[0].scope)
-            p["scope_v3"] = p.factor_v3.map(f3[0].scope)
-            pairs_all.append(p.assign(dataset=ds))
+            p = labelled_pairs(f2, f3, ds)
+            pairs_all.append(p)
             for r in p.itertuples():
                 if str(r.label_v2).startswith("list:") and r.label_v2 == r.label_v3:
                     t2 = set(f2[1].loc[r.factor_v2].sort_values(ascending=False).index[:N_TOP])
@@ -276,42 +434,7 @@ def main() -> None:
     support = pd.concat(support, ignore_index=True)
     ages = pd.concat(ages, ignore_index=True) if ages else pd.DataFrame()
     refine = pd.DataFrame(refine)
-    enrich = pd.concat(enrich, ignore_index=True) if enrich else pd.DataFrame()
-    erep = pd.DataFrame()
-    if len(enrich):
-        enrich["q"] = np.nan
-        for _, ix in enrich.groupby("dataset").groups.items():
-            enrich.loc[ix, "q"] = C.bh(enrich.loc[ix, "p"])
-        rows = []
-        for p in pairs.itertuples():
-            e2 = enrich[(enrich.dataset == p.dataset) & (enrich.chemistry == "v2") & (enrich.factor == p.factor_v2)]
-            e3 = enrich[(enrich.dataset == p.dataset) & (enrich.chemistry == "v3") & (enrich.factor == p.factor_v3)]
-            m = e2.merge(e3, on="gene_set", suffixes=("_v2", "_v3"))
-            for r in m.itertuples():
-                rows.append({"dataset": p.dataset, "pair": f"{p.factor_v2}~{p.factor_v3}", "scope": p.scope_v2,
-                             "cosine": p.cosine, "gene_set": r.gene_set, "fold_v2": r.fold_v2, "fold_v3": r.fold_v3,
-                             "q_v2": r.q_v2, "q_v3": r.q_v3,
-                             "replicated": bool(r.q_v2 < 0.05 and r.q_v3 < 0.05),
-                             "genes_in_both": "|".join(sorted(set(r.genes_v2.split("|")) & set(r.genes_v3.split("|"))
-                                                              - {""}))})
-        erep = pd.DataFrame(rows)
-    acomb = pd.DataFrame()
-    if len(pairs) and len(ages):
-        rows = []
-        for p in pairs.itertuples():
-            for chem, f in (("v2", p.factor_v2), ("v3", p.factor_v3)):
-                a = ages[(ages.dataset == p.dataset) & (ages.chemistry == chem) & (ages.factor == f)]
-                for r in a.itertuples():
-                    rows.append({"dataset": p.dataset, "pair": f"{p.factor_v2}~{p.factor_v3}",
-                                 "label": p.label_v2 if p.label_v2 == p.label_v3 else f"{p.label_v2} / {p.label_v3}",
-                                 "scope": p.scope_v2, "cell_class": r.cell_class, "region": r.region,
-                                 "chemistry": chem, "rho_vs_age": r.rho_vs_age,
-                                 "perm_p": r.perm_p, "n_ages": r.n_ages})
-        if rows:
-            acomb = C.combine_chemistries(pd.DataFrame(rows), ["dataset", "pair", "label", "scope", "cell_class",
-                                                               "region"],
-                                          effect="rho_vs_age", weight="n_ages",
-                                          labels=("rises with age", "falls with age"), carry=("rho_vs_age",))
+    acomb = combine_ages(pairs, ages) if len(pairs) and len(ages) else pd.DataFrame()
     support["q"] = C.bh(support.perm_p) if "perm_p" in support else np.nan
     if "added_perm_p" in support:
         support["added_q"] = C.bh(support.added_perm_p)
@@ -333,9 +456,6 @@ def main() -> None:
     out.write(support, "held_out_support", "Per factor: top-gene coherence across the other chemistry's clusters vs "
               "matched genes; added-vs-kept genes correlation for prior-labelled factors")
     out.write(ages, "factor_age_trends_per_stratum", "Per factor x class: Spearman of mean cell score with age")
-    out.write(enrich, "ndd_enrichment_data_driven", "Per free factor x NDD set: set genes among the top "
-              f"{N_TOP} vs the expression-matched expectation; exact p, BH")
-    out.write(erep, "ndd_enrichment_replicated", "Per v2 / v3 pair of data-driven factors x NDD set: both chemistries")
     out.write(refine, "list_refinement", "Per list-labelled factor pair: genes added in both fits, list genes kept / dropped in both")
 
     f = []
@@ -388,20 +508,7 @@ def main() -> None:
                  f"programmes {kept:.0%} of list genes outweigh 95% of non-list genes in both fits. At lam = 0.01 the "
                  "prior holds the whole list together, so Spectra does not prune the lists; whether a list coheres in "
                  "the data is what the held-out test above (and 07) measures (list_refinement.csv has the details).")
-    if len(erep):
-        rp = erep[erep.replicated].copy()
-        rp["fmin"] = rp[["fold_v2", "fold_v3"]].min(axis=1)
-        rp = rp.sort_values("fmin", ascending=False)
-        n_dd = int(overview.free.sum())
-        v2 = overview[overview.chemistry == "v2"]
-        lead = {(r.dataset, r.factor): ", ".join(str(r.top_genes).split("|")[:4]) for r in v2.itertuples()}
-        f.append(f"**NDD genes in data-driven programmes** ({n_dd} free factors, fitted without a prior set; NDD set "
-                 f"among the top {N_TOP} vs the expression-matched expectation; q < 0.05 in both chemistries): "
-                 + ("; ".join(f"{r.dataset} {r.pair} ({r.scope}; top {lead[(r.dataset, r.pair.split('~')[0])]}) "
-                              f"{r.gene_set} x{r.fold_v2:.1f}/x{r.fold_v3:.1f} "
-                              f"({', '.join(str(r.genes_in_both).split('|')[:8])})"
-                              for r in rp.head(MAX_LISTED * 2).itertuples())
-                    if len(rp) else "none") + ".")
+    f.extend(core_section(out, rng))
     if "best_08_module_overlap" in overview:
         nm = overview[(overview.label == "new") & (overview.best_08_module_overlap < 0.2)]
         f.append(f"**New programmes vs the 08 co-expression modules**: {int((overview.label == 'new').sum())} new "
@@ -457,9 +564,9 @@ def main() -> None:
          f"Replication: mutual-best cosine of gene weights >= {MATCH_MIN}. Held-out support: mean pairwise Spearman of a "
          f"factor's top {N_TOP} genes across the other chemistry's cluster pseudobulks vs {N_RANDOM} random sets matched "
          "on level x spread; added genes' correlation with kept prior genes vs matched random genes; BH.",
-         f"NDD enrichment: in the free factors (fitted without a prior set), NDD set genes among the top {N_TOP} vs "
-         "the expectation from each gene's level x spread bin, exact Poisson-binomial p; BH per dataset; "
-         "replicated when q < 0.05 for both factors of a v2 / v3 pair.",
+         f"NDD enrichment (core-prior fit, no NDD set in its prior): NDD set genes among each factor's top {N_TOP} vs "
+         "the expectation from each gene's level x spread bin, exact Poisson-binomial p, a steered factor's own "
+         "prior-set genes left out; BH per dataset; replicated when q < 0.05 for both factors of a v2 / v3 pair.",
          f"Age: Spearman of mean cell score per class x age (>= {MIN_AGES} ages, >= {MIN_SCORE_CELLS} cells), pooled "
          "and within each region; replicated pairs combined (signed Stouffer, BH, tiered). Lists: added = top-50 in both fits and not in the list; kept = weight above "
          f"the {KEEP_Q:.0%} quantile of non-list genes in both; dropped = at or below their median in both."],

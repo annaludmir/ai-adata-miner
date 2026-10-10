@@ -127,12 +127,15 @@ echo its prior regardless of the data: it pairs v2 and v3 factors by gene
 weights, tests each factor's top genes for co-expression in the other
 chemistry's cluster pseudobulks (independent donors) against matched genes,
 tests whether genes Spectra added to a list co-vary with the list genes it kept,
-tests the NDD lists for enrichment among the top genes of data-driven
-programmes (against expression-matched random sets), tracks programme activity
+tests the NDD lists for enrichment among the top genes of a second, core-prior
+fit's programmes (GO, cell cycle and markers only, so no NDD set shaped them;
+against the expression-matched expectation), tracks programme activity
 over age per class -- within each region as well as pooled -- and checks new
 factors against the 08 modules. List programmes reproduce their lists almost
 whole (the prior holds them together), so Spectra does not prune lists; the
-informative programmes for the lists are the data-driven ones. Next
+informative programmes for the lists are those of the core-prior fit (in the
+list-guided fit the lists dominate the global gene-gene graph, which pulls even
+the free factors into them). Next
 candidates: STRING-expanded priors and a data-driven comparison (scHPF / cNMF).
 
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,

@@ -30,6 +30,7 @@
 #   sbatch --partition=<gpu partition> --gres=gpu:1 \
 #          --export=ALL,DATASET=human_dev,CHEMISTRY=v2,SPECTRA_BACKEND=gpu slurm_spectra.sh
 # Refit without redrawing the subsample: SKIP_INPUT=true
+# Core-prior fit (no gene lists / NDD seeds in the prior; -> 25_spectra_core/): SPECTRA_PRIOR=core
 
 set -uo pipefail
 
@@ -49,6 +50,7 @@ mamba activate "$AIM_ENV"
 aim_setup
 echo "work dir   : ${AIM_WORK}"
 echo "backend    : ${SPECTRA_BACKEND}${SPECTRA_EPOCHS:+, ${SPECTRA_EPOCHS} epochs}"
+echo "prior      : ${SPECTRA_PRIOR:-full}"
 if ! mamba run -p "$AIM_ENV" python -c "import Spectra" 2>/dev/null; then
   echo "ERROR: scSpectra not importable in $AIM_ENV -- install it:"
   echo "  mamba run -p \"$AIM_ENV\" pip install scSpectra \"setuptools<81\""

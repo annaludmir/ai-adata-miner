@@ -17,6 +17,11 @@ Prior (built here):
              myelination, inflammation, interferon, apoptosis); plus
              N_NEW_GLOBAL extra factors with no prior, free to find new programmes
   per class  the seed marker panel of that class (radial glia, IPC, ...)
+--prior core leaves out the user lists and the NDD seeds and adds more free
+factors (PRIORS), so the lists can be tested against programmes they did not
+shape: outputs go to 25_spectra_core/ and the work files get a _core suffix.
+(With --prior full the big lists dominate the global gene-gene graph, which
+every global factor -- free ones included -- is fitted to.)
 Genes are matched to the subsample's symbols (case-insensitive, or by Ensembl
 id); sets need >= MIN_SET_GENES genes detected in the subsample.
 
@@ -25,11 +30,11 @@ published full-batch model, default) or 'gpu' (the package's minibatched
 Spectra_gpu module, marked by its authors as still in development).
 
 Outputs
-  <AIM_WORK>/spectra/<ns>/{model.pt, cell_scores.npz}
+  <AIM_WORK>/spectra/<ns>/{model.pt, cell_scores.npz}   (_core suffix for --prior core)
   csv_exports/<ns>/25_spectra/
     prior_sets.csv              every prior set: scope, genes found, genes in the model
     factor_info.csv             per factor: scope, best-matching prior set and overlap coefficient
-                                of its top genes, label ('new' below OVERLAP_MIN), top genes
+                                of its top genes, label ('new' below OVERLAP_MIN), free (no prior), top genes
     factor_gene_weights.csv     factors x model genes (wide)
     factor_scores_by_group.csv  mean cell score per factor x (class | class x age | donor)
 """
@@ -53,6 +58,11 @@ from lib.panels import load_panels
 
 SCRIPT = "25_spectra_fit"
 SUBDIR = "25_spectra"
+SUFFIX = ""
+# --prior full: the gene lists and NDD seeds steer factors (25_spectra/). --prior core: only core
+# biology (GO processes, cell-cycle panels, class markers) with more free factors, so the NDD lists
+# can be tested against programmes they did not shape (25_spectra_core/, *_core work files).
+PRIORS = {"full": ("25_spectra", "", 5), "core": ("25_spectra_core", "_core", 15)}
 CORE_GO = ["GO:0007411", "GO:0007416", "GO:0007268", "GO:0007219", "GO:0060070", "GO:0007224", "GO:0030509",
            "GO:0008543", "GO:0048384", "GO:0035329", "GO:0060271", "GO:0030198", "GO:0071456", "GO:0006986",
            "GO:0006096", "GO:0006695", "GO:0002181", "GO:0006120", "GO:0000398", "GO:0006338", "GO:0001764",
@@ -129,7 +139,7 @@ def plateau_train(plateau: int, rec: dict, rel_tol: float = 1e-4):
     return train
 
 
-def prior(a) -> tuple[dict, pd.DataFrame]:
+def prior(a, core: bool = False) -> tuple[dict, pd.DataFrame]:
     upper = {g.upper(): g for g in a.var_names}
     acc = {str(x).split(".")[0]: g for x, g in zip(a.var["accession"], a.var_names)} if "accession" in a.var else {}
 
@@ -144,7 +154,8 @@ def prior(a) -> tuple[dict, pd.DataFrame]:
 
     rows, glob = [], {}
     panels = load_panels()
-    for grp, prefix in (("user_lists", "list"), ("ndd", "seed"), ("cell_cycle", "seed")):
+    groups = (("cell_cycle", "seed"),) if core else (("user_lists", "list"), ("ndd", "seed"), ("cell_cycle", "seed"))
+    for grp, prefix in groups:
         for name, genes in panels.get(grp, {}).items():
             m = mapped(genes)
             rows.append({"scope": "global", "set": f"{prefix}:{name}", "n_input": len(genes), "n_found": len(m)})
@@ -193,7 +204,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     np.random.seed(config.RANDOM_SEED)
     a = ad.read_h5ad(work / "input.h5ad")
     a.obs["cell_class"] = a.obs["cell_class"].astype(str)
-    gsd, sets = prior(a)
+    gsd, sets = prior(a, core=args.prior == "core")
     # Spectra (0.2.1) indexes .X with a pandas mask, which current scipy rejects for sparse
     # matrices, and densifies it anyway: hand it a dense matrix restricted to the genes it uses
     # (highly variable + every prior-set gene).
@@ -206,7 +217,7 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     for c in gsd:
         if c != "global":
             L[c] = len(gsd[c]) + 1
-    log(f"  prior: {len(gsd['global'])} global sets (+{N_NEW_GLOBAL} free factors), cell-type sets "
+    log(f"  prior ({args.prior}): {len(gsd['global'])} global sets (+{N_NEW_GLOBAL} free factors), cell-type sets "
         + ", ".join(f"{c} {len(v)}" for c, v in gsd.items() if c != "global") + f"; {sum(L.values())} factors")
     log(f"  backend {args.backend}, {args.epochs} epochs, torch threads {torch.get_num_threads()}, "
         f"cuda {'available' if torch.cuda.is_available() else 'not available'}")
@@ -251,12 +262,18 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
         log(f"  WARNING: factor scopes ({len(scope)}) do not match factors ({factors.shape[0]}); scopes left blank")
         scope = [""] * factors.shape[0]
     try:
-        model.save(str(work / "model.pt"))
+        model.save(str(work / f"model{SUFFIX}.pt"))
     except Exception as err:          # saving is a convenience; results are in the CSVs
         log(f"  model not saved: {err}")
-    np.savez_compressed(work / "cell_scores.npz", scores=scores, cells=a.obs_names.to_numpy())
+    np.savez_compressed(work / f"cell_scores{SUFFIX}.npz", scores=scores, cells=a.obs_names.to_numpy())
 
     flat = {s: set(g) for v in gsd.values() for s, g in v.items()}
+    # free (prior-less) factors: the last N_NEW_GLOBAL global ones and the last one of each class
+    free = np.zeros(factors.shape[0], bool)
+    if all(scope):
+        sc = pd.Series(scope)
+        for sname, g in sc.groupby(sc, sort=False):
+            free[g.index[-(N_NEW_GLOBAL if sname == "global" else 1):]] = True
     info = []
     for k in range(factors.shape[0]):
         top = vocab[np.argsort(-factors[k])[:N_TOP]]
@@ -266,7 +283,8 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
             if c > coef:
                 best, coef = s, c
         info.append({"factor": f"F{k:02d}", "scope": scope[k], "best_prior_set": best, "overlap_coefficient": coef,
-                     "label": best if coef >= OVERLAP_MIN else "new", "top_genes": "|".join(top[:20]),
+                     "label": best if coef >= OVERLAP_MIN else "new", "free": bool(free[k]),
+                     "top_genes": "|".join(top[:20]),
                      "mean_cell_score": float(scores[:, k].mean())})
     info = pd.DataFrame(info)
     sets["in_prior"] = sets.set.isin(flat)
@@ -316,15 +334,16 @@ def rescore(key: str, chem: str | None = None, ns: str | None = None) -> None:
     man = Manifest(ns, SCRIPT)
     work = config.WORK_DIR / "spectra" / ns
     info_csv = config.CSV_EXPORTS / ns / SUBDIR / "factor_info.csv"
-    if not ((work / "cell_scores.npz").exists() and (work / "input.h5ad").exists() and info_csv.exists()):
-        log(f"  no finished fit for {ns} (cell_scores.npz, input.h5ad, factor_info.csv); skipping")
+    npz = work / f"cell_scores{SUFFIX}.npz"
+    if not (npz.exists() and (work / "input.h5ad").exists() and info_csv.exists()):
+        log(f"  no finished fit for {ns} ({npz.name}, input.h5ad, {SUBDIR}/factor_info.csv); skipping")
         man.flush()
         return
-    z = np.load(work / "cell_scores.npz", allow_pickle=True)
+    z = np.load(npz, allow_pickle=True)
     obs = ad.read_h5ad(work / "input.h5ad", backed="r").obs.copy()
     obs = obs.loc[pd.Index(z["cells"].astype(str))]
     factors = list(pd.read_csv(info_csv).factor)
-    log(f"  rescoring {len(obs):,} cells x {len(factors)} factors from {work / 'cell_scores.npz'}")
+    log(f"  rescoring {len(obs):,} cells x {len(factors)} factors from {npz}")
     write_group_scores(man, obs, z["scores"], factors)
     man.flush()
 
@@ -336,13 +355,18 @@ def main() -> None:
                    help="maximum training epochs (default 10000 for cpu -- the plateau rule usually stops "
                         "earlier; 50 minibatch epochs for gpu)")
     p.add_argument("--batch-size", type=int, default=1000, help="gpu backend: cells per minibatch")
-    p.add_argument("--lam", type=float, default=0.01, help="weight of the prior graph vs expression")
+    p.add_argument("--lam", type=float, default=0.01,
+                   help="weight of the expression term against the prior graph (Spectra's lam; larger = data count more)")
+    p.add_argument("--prior", choices=list(PRIORS), default=os.environ.get("SPECTRA_PRIOR", "full"),
+                   help="full: lists + NDD seeds + core biology; core: core biology only, more free factors")
     p.add_argument("--plateau", type=int, default=int(os.environ.get("SPECTRA_PLATEAU", 50)),
                    help="cpu backend: lower the learning rate after this many epochs without a new best loss; "
                         "0 = Spectra's own training rule")
     p.add_argument("--rescore", action="store_true",
                    help="only rewrite factor_scores_by_group from the saved cell scores of a finished fit")
     args = p.parse_args()
+    global SUBDIR, SUFFIX, N_NEW_GLOBAL
+    SUBDIR, SUFFIX, N_NEW_GLOBAL = PRIORS[args.prior]
     if args.rescore:
         for key, chem, ns in cli.dataset_variants(args):
             rescore(key, chem, ns)

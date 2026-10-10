@@ -154,6 +154,19 @@ or at `SPECTRA_EPOCHS` (default 10000). `SPECTRA_PLATEAU=0` restores Spectra's
 rule. The job log and `25_spectra/fit_summary.csv` give the epochs run, why
 training stopped and the rate steps; `training_trace.csv` the loss per epoch.
 
+**Second fit, core prior.** With the gene lists in the prior they dominate the
+global gene-gene graph, so even the free factors are pulled into them and the
+lists cannot be tested against the programmes. `SPECTRA_PRIOR=core` fits GO
+processes, cell-cycle panels and class markers only, with 15 free global
+factors, into `25_spectra_core/` (work files `*_core`); analysis 36 tests the
+NDD lists against those programmes. Reuse the subsamples:
+
+```bash
+for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch,SKIP_INPUT=true,SPECTRA_PRIOR=core slurm_spectra.sh
+done; done
+```
+
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
 
@@ -161,6 +174,8 @@ added) without refitting, run on a compute node:
 srun --account=miridan-users_v2 --partition=power-general-public-pool --qos=public --mem=16G --time=00:30:00 \
   /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python scripts_generated/25_spectra_fit.py --rescore
 ```
+
+(add `--prior core` for the core-prior fits)
 Fit all four strata with the same settings. Rerun
 step 3 (or just analysis 36) afterwards.
 
