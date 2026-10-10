@@ -77,18 +77,6 @@ def pole_genes() -> dict[tuple[int, str], list[str]]:
             for (f, d), g in mg.groupby(["factor", "direction"])}
 
 
-def poisson_binomial_sf(probs: np.ndarray, k: int) -> float:
-    """P(X >= k) for X a sum of independent Bernoulli(probs)."""
-    if k <= 0:
-        return 1.0
-    dist = np.zeros(k)          # P(X = 0 .. k-1) so far; mass beyond k-1 is dropped
-    dist[0] = 1.0
-    for p in probs:
-        dist[1:] = dist[1:] * (1 - p) + dist[:-1] * p
-        dist[0] *= (1 - p)
-    return float(max(0.0, 1.0 - dist.sum()))
-
-
 def identity(out: C.Output, poles: dict) -> pd.DataFrame:
     rows = []
     prof = {}
@@ -165,7 +153,7 @@ def lists_in_factors(out: C.Output, poles_genes: dict) -> pd.DataFrame:
             rows.append({"gene_set": name, "factor": k, "pole": d, "n_set_genes": int(idx.size),
                          "pole_size": int(mask.sum()), "overlap": obs, "expected": exp,
                          "fold": obs / exp if exp > 0 else np.nan,
-                         "p": poisson_binomial_sf(probs, obs),
+                         "p": C.poisson_binomial_sf(probs, obs),
                          "genes": "|".join(genes[idx][mask[idx]][:30])})
     res = pd.DataFrame(rows)
     res["q"] = C.bh(res.p)

@@ -1059,6 +1059,18 @@ def matched_draws(bins: np.ndarray, idx: np.ndarray, n_sets: int,
     return np.stack([rng.choice(pools[int(bins[i])], size=n_sets) for i in idx], axis=1)
 
 
+def poisson_binomial_sf(probs: np.ndarray, k: int) -> float:
+    """P(X >= k) for X a sum of independent Bernoulli(probs)."""
+    if k <= 0:
+        return 1.0
+    dist = np.zeros(k)          # P(X = 0 .. k-1) so far; mass beyond k-1 is dropped
+    dist[0] = 1.0
+    for p in probs:
+        dist[1:] = dist[1:] * (1 - p) + dist[:-1] * p
+        dist[0] *= (1 - p)
+    return float(max(0.0, 1.0 - dist.sum()))
+
+
 def null_effect(obs: float, null) -> tuple[float, float, float, float]:
     """(effect in null SDs, two-sided empirical p, null mean, null SD)."""
     null = np.asarray(null, dtype=float)
