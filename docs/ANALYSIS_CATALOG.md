@@ -141,7 +141,8 @@ the free factors into them). A third fit adds STRING network modules
 also form a programme that replicates across chemistries and holds in held-out
 donors. A prior-free fit, consensus NMF (script 26, `slurm_cnmf.sh`), on the same
 cells and genes gets the same tests, and 36 matches its programmes to the
-core- and STRING-prior ones by shared top genes.
+core- and STRING-prior ones by shared top genes. Write-up of the design and
+findings: [GENE_PROGRAMMES.md](GENE_PROGRAMMES.md).
 
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse
