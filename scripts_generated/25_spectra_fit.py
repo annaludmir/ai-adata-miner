@@ -60,6 +60,7 @@ import config
 from lib import cli
 from lib.io_utils import Manifest, log
 from lib.panels import load_panels
+from lib.programs import write_group_scores
 
 SCRIPT = "25_spectra_fit"
 SUBDIR = "25_spectra"
@@ -390,31 +391,8 @@ def run(key: str, args, chem: str | None = None, ns: str | None = None) -> None:
     w = pd.DataFrame(factors, index=info.factor, columns=vocab)
     man.write(w.reset_index(), "factor_gene_weights", "Gene weights per factor (factors x model genes)",
               subdir=SUBDIR)
-    write_group_scores(man, a.obs, scores, list(info.factor))
+    write_group_scores(man, a.obs, scores, list(info.factor), SUBDIR)
     man.flush()
-
-
-def write_group_scores(man: Manifest, obs: pd.DataFrame, scores: np.ndarray, factors: list[str]) -> None:
-    """Mean cell score per factor in each class, class x age, class x region x age and donor."""
-    S = pd.DataFrame(scores, index=obs.index, columns=factors)
-    cls = obs.cell_class.astype(str)
-    groups = {"cell_class": cls}
-    if "age_pcw" in obs:
-        groups["cell_class_x_age"] = cls + " | " + obs.age_pcw.astype(str)
-        if "region" in obs:
-            groups["cell_class_x_region_x_age"] = cls + " | " + obs.region.astype(str) + " | " + obs.age_pcw.astype(str)
-    if "donor" in obs:
-        groups["donor"] = obs.donor.astype(str)
-    long = []
-    for gname, lab in groups.items():
-        m = S.groupby(lab.to_numpy()).mean()
-        n = lab.value_counts()
-        t = m.reset_index(names="group").melt(id_vars="group", var_name="factor", value_name="mean_score")
-        t.insert(0, "grouping", gname)
-        t["n_cells"] = t.group.map(n).astype(int)
-        long.append(t)
-    man.write(pd.concat(long, ignore_index=True), "factor_scores_by_group",
-              "Mean cell score per factor per class, class x age, class x region x age and donor", subdir=SUBDIR)
 
 
 def rescore(key: str, chem: str | None = None, ns: str | None = None) -> None:
@@ -435,7 +413,7 @@ def rescore(key: str, chem: str | None = None, ns: str | None = None) -> None:
     obs = obs.loc[pd.Index(z["cells"].astype(str))]
     factors = list(pd.read_csv(info_csv).factor)
     log(f"  rescoring {len(obs):,} cells x {len(factors)} factors from {npz}")
-    write_group_scores(man, obs, z["scores"], factors)
+    write_group_scores(man, obs, z["scores"], factors, SUBDIR)
     man.flush()
 
 

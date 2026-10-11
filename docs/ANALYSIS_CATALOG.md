@@ -139,8 +139,9 @@ the free factors into them). A third fit adds STRING network modules
 (experimental / curated-database edges only, no text mining) to the core prior;
 36 tests it the same way and asks which STRING modules are rich in NDD genes and
 also form a programme that replicates across chemistries and holds in held-out
-donors. Next
-candidate: a prior-free comparison (scHPF / cNMF).
+donors. A prior-free fit, consensus NMF (script 26, `slurm_cnmf.sh`), on the same
+cells and genes gets the same tests, and 36 matches its programmes to the
+core- and STRING-prior ones by shared top genes.
 
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,
 `ClustersModularity`, `ClustersSurprise`) were computed per chemistry and reuse

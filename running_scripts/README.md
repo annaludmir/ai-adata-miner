@@ -182,6 +182,21 @@ for ds in cortex human_dev; do for ch in v2 v3; do
 done; done
 ```
 
+**Prior-free comparison, cNMF (script 26).** Consensus NMF fits programmes with
+no prior on the same cells and genes as Spectra (7 values of K x 100 replicates;
+K = the largest whose stability is within 0.05 of the best, unless `CNMF_K` is
+set). Install once, then one job per stratum (~2-4 h on 16 cores):
+
+```bash
+/miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python -m pip install cnmf
+for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_cnmf.sh
+done; done
+```
+
+`26_cnmf/k_selection.csv` lists stability and error per K; another K from the
+saved replicates takes minutes: `CNMF_K=30 CNMF_SKIP_FACTORIZE=true`.
+
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
 
