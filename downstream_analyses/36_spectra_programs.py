@@ -38,13 +38,14 @@ Method
      a module-steered factor's module genes are left out), plus each STRING
      module's own NDD content (vs the expression-matched expectation) next to
      whether its programme replicates v2 / v3 and holds in held-out donors.
-     And for a prior-free fit (cNMF, script 26), with a comparison of its
-     programmes against the core- and STRING-prior ones (shared top genes).
+     And for two prior-free fits (cNMF, script 26; scHPF, script 27), with
+     their programmes matched to the core- and STRING-prior ones and to each
+     other (shared top genes).
   E2. For list-labelled factor pairs, genes added in both fits and
      list genes kept in both (weight above the 95th percentile of non-list genes
      in the factor) and dropped in both (weight at or below their median).
 
-Inputs: csv_exports/<ds>__<chem>/25_spectra/*, 25_spectra_core/*, 25_spectra_string/*, 26_cnmf/*; cluster pseudobulks (07/08 rules);
+Inputs: csv_exports/<ds>__<chem>/25_spectra/*, 25_spectra_core/*, 25_spectra_string/*, 26_cnmf/*, 27_schpf/*; cluster pseudobulks (07/08 rules);
 GO BP gene sets (annotations)
 """
 from __future__ import annotations
@@ -73,8 +74,9 @@ MIN_SET_GENES = 10
 # the fits whose prior holds no NDD set: (export subfolder, output-file prefix, name in the summary)
 VARIANTS = {"core": ("25_spectra_core", "core", "Core-prior fit"),
             "string": ("25_spectra_string", "string", "STRING-prior fit"),
-            "cnmf": ("26_cnmf", "cnmf", "cNMF fit (no prior)")}
-MATCH_TOP = 0.3     # top-gene overlap coefficient at which a cNMF programme counts as found by a Spectra fit
+            "cnmf": ("26_cnmf", "cnmf", "cNMF fit (no prior)"),
+            "schpf": ("27_schpf", "schpf", "scHPF fit (no prior)")}
+MATCH_TOP = 0.3     # share of shared top genes at which a prior-free programme counts as found by another fit
 MAX_LISTED = 10
 
 
@@ -395,7 +397,8 @@ def core_section(out: C.Output, rng: np.random.Generator, variant: str = "core")
     ok = support[(support.q < 0.05) & (support.effect_vs_null_sd > 0)]
     what = {"core": "GO processes, cell-cycle panels and class markers only, more free factors",
             "string": "the core prior plus STRING network modules (experimental / database evidence)",
-            "cnmf": "consensus NMF, no prior at all; K chosen by stability (script 26)"}[variant]
+            "cnmf": "consensus NMF, no prior at all; K chosen by stability (script 26)",
+            "schpf": "hierarchical Poisson factorisation of raw counts, no prior; K = cNMF's (script 27)"}[variant]
     f.append(f"**{title}** ({what}; the NDD lists are tested against programmes they did not shape): " + "; ".join(
                  f"{ds} {ch}: {len(g)} factors ({int(g.free.sum())} free), "
                  f"{len(ok[(ok.dataset == ds) & (ok.chemistry == ch)])} supported in the other chemistry's donors"
@@ -459,42 +462,45 @@ def core_section(out: C.Output, rng: np.random.Generator, variant: str = "core")
     return f
 
 
-def cnmf_vs_spectra(out: C.Output) -> list[str]:
-    """Which cNMF (prior-free) programmes do the Spectra fits also find, by top-gene overlap?"""
+def prior_free_matches(out: C.Output) -> list[str]:
+    """Which programmes of the prior-free fits (cNMF, scHPF) do the other fits also find, by top-gene overlap?"""
+    others = {"cnmf": ("core", "string", "schpf"), "schpf": ("core", "string", "cnmf")}
     rows = []
     for ds, chem in C.STRATA:
-        cn = load(C.ns(ds, chem), out, VARIANTS["cnmf"][0])
-        if cn is None:
-            continue
-        ctop = {f: set(cn[1].loc[f].nlargest(N_TOP).index) for f in cn[1].index}
-        best = {f: {} for f in ctop}
-        for variant in ("core", "string"):
-            sp = load(C.ns(ds, chem), out, VARIANTS[variant][0])
-            if sp is None:
+        tops = {}
+        for v in ("core", "string", "cnmf", "schpf"):
+            fit = load(C.ns(ds, chem), out, VARIANTS[v][0])
+            if fit is not None:
+                tops[v] = ({f: set(fit[1].loc[f].nlargest(N_TOP).index) for f in fit[1].index}, fit[0])
+        for method, against in others.items():
+            if method not in tops:
                 continue
-            stop = {f: set(sp[1].loc[f].nlargest(N_TOP).index) for f in sp[1].index}
-            for f, t in ctop.items():
-                ov = {g: len(t & u) / N_TOP for g, u in stop.items()}
-                g = max(ov, key=ov.get)
-                best[f][variant] = (g, ov[g], sp[0].loc[g, "label"])
-        for f in ctop:
-            row = {"dataset": ds, "chemistry": chem, "cnmf_factor": f, "nearest_go": cn[0].loc[f, "nearest_go"],
-                   "top_genes": cn[0].loc[f, "top_genes"]}
-            for variant, (g, ov, lab) in best[f].items():
-                row.update({f"best_{variant}": g, f"{variant}_overlap": ov, f"{variant}_label": lab})
-            rows.append(row)
+            mt, minfo = tops[method]
+            for f, t in mt.items():
+                row = {"method": method, "dataset": ds, "chemistry": chem, "factor": f,
+                       "nearest_go": minfo.loc[f, "nearest_go"], "top_genes": minfo.loc[f, "top_genes"]}
+                for v in against:
+                    if v not in tops:
+                        continue
+                    ov = {g: len(t & u) / N_TOP for g, u in tops[v][0].items()}
+                    g = max(ov, key=ov.get)
+                    row.update({f"best_{v}": g, f"{v}_overlap": ov[g], f"{v}_label": tops[v][1].loc[g, "label"]})
+                rows.append(row)
     if not rows:
         return []
     t = pd.DataFrame(rows)
-    out.write(t, "cnmf_vs_spectra", f"Per cNMF programme: best-matching core- and STRING-prior Spectra programme "
-              f"(share of shared top-{N_TOP} genes)")
-    parts = []
-    for (ds, chem), g in t.groupby(["dataset", "chemistry"]):
-        bits = [f"{int((g[f'{v}_overlap'] >= MATCH_TOP).sum())} in the {v} fit" for v in ("core", "string")
-                if f"{v}_overlap" in g]
-        parts.append(f"{ds} {chem}: {len(g)} cNMF programmes, " + ", ".join(bits))
-    return [f"**cNMF programmes also found by Spectra** (share of top-{N_TOP} genes shared >= {MATCH_TOP}): "
-            + "; ".join(parts) + "."]
+    out.write(t, "prior_free_matches", f"Per cNMF / scHPF programme: best-matching programme of the core- and "
+              f"STRING-prior Spectra fits and of the other prior-free fit (share of shared top-{N_TOP} genes)")
+    f = []
+    for method, g0 in t.groupby("method", sort=False):
+        parts = []
+        for (ds, chem), g in g0.groupby(["dataset", "chemistry"]):
+            bits = [f"{int((g[f'{v}_overlap'] >= MATCH_TOP).sum())} in {v}" for v in others[method]
+                    if f"{v}_overlap" in g]
+            parts.append(f"{ds} {chem}: {len(g)} programmes, " + ", ".join(bits))
+        f.append(f"**{ {'cnmf': 'cNMF', 'schpf': 'scHPF'}[method]} programmes also found by the other fits** (share of "
+                 f"top-{N_TOP} genes shared >= {MATCH_TOP}): " + "; ".join(parts) + ".")
+    return f
 
 
 def main() -> None:
@@ -643,7 +649,8 @@ def main() -> None:
     f.extend(core_section(out, rng, "core"))
     f.extend(core_section(out, rng, "string"))
     f.extend(core_section(out, rng, "cnmf"))
-    f.extend(cnmf_vs_spectra(out))
+    f.extend(core_section(out, rng, "schpf"))
+    f.extend(prior_free_matches(out))
     if "best_08_module_overlap" in overview:
         nm = overview[(overview.label == "new") & (overview.best_08_module_overlap < 0.2)]
         f.append(f"**New programmes vs the 08 co-expression modules**: {int((overview.label == 'new').sum())} new "
@@ -713,7 +720,7 @@ def main() -> None:
          "The gpu backend (Spectra_gpu, minibatched) is marked by its authors as in development; the cpu backend is "
          "the published model."],
         ["Test larger top-gene sets (100-200 genes per programme), which would catch lists spread thinly over a "
-         "programme; scHPF as a second prior-free method."])
+         "programme."])
 
 
 if __name__ == "__main__":

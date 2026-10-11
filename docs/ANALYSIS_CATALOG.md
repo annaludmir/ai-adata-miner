@@ -139,9 +139,10 @@ the free factors into them). A third fit adds STRING network modules
 (experimental / curated-database edges only, no text mining) to the core prior;
 36 tests it the same way and asks which STRING modules are rich in NDD genes and
 also form a programme that replicates across chemistries and holds in held-out
-donors. A prior-free fit, consensus NMF (script 26, `slurm_cnmf.sh`), on the same
-cells and genes gets the same tests, and 36 matches its programmes to the
-core- and STRING-prior ones by shared top genes. Write-up of the design and
+donors. Two prior-free fits on the same cells and genes, consensus NMF (script
+26, `slurm_cnmf.sh`) and scHPF (script 27, `slurm_schpf.sh`, same K), get the
+same tests, and 36 matches their programmes to the core- and STRING-prior ones
+and to each other by shared top genes. Write-up of the design and
 findings: [GENE_PROGRAMMES.md](GENE_PROGRAMMES.md).
 
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,

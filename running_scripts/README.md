@@ -203,6 +203,18 @@ one chemistry and not the other. It can also be run on its own later
 nothing. `26_cnmf/k_selection.csv` lists stability and error per K; a K by hand:
 `CNMF_K=30 CNMF_SKIP_FACTORIZE=true`.
 
+**Second prior-free method, scHPF (script 27).** Hierarchical Poisson
+factorisation of the raw counts, same cells and genes, K = the dataset's cNMF K
+(so run cNMF and its finalise step first), best of 5 random starts. scHPF is
+not on PyPI; install it from GitHub, then one job per stratum:
+
+```bash
+/miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python -m pip install git+https://github.com/simslab/scHPF.git
+for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_schpf.sh
+done; done
+```
+
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
 
