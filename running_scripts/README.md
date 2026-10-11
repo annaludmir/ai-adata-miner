@@ -189,13 +189,19 @@ set). Install once, then one job per stratum (~2-4 h on 16 cores):
 
 ```bash
 /miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python -m pip install cnmf
-for ds in cortex human_dev; do for ch in v2 v3; do
-  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_cnmf.sh
-done; done
+ids=$(for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --parsable --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_cnmf.sh
+done; done | paste -sd:)
+sbatch --dependency=afterok:$ids --export=ALL,CNMF_FINALISE=true slurm_cnmf.sh
 ```
 
-`26_cnmf/k_selection.csv` lists stability and error per K; another K from the
-saved replicates takes minutes: `CNMF_K=30 CNMF_SKIP_FACTORIZE=true`.
+The last job gives both chemistries of a dataset the same K -- the largest that
+passes the stability rule in both -- and redoes the consensus (minutes, from the
+saved replicates) where K changes; with different K a programme can be split in
+one chemistry and not the other. It can also be run on its own later
+(`sbatch --export=ALL,CNMF_FINALISE=true slurm_cnmf.sh`); a second run changes
+nothing. `26_cnmf/k_selection.csv` lists stability and error per K; a K by hand:
+`CNMF_K=30 CNMF_SKIP_FACTORIZE=true`.
 
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:

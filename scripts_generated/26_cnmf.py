@@ -13,7 +13,10 @@ genes. N_ITER replicates per K in K_GRID (CNMF_K_GRID="15 20 ..." overrides), sp
 largest K whose stability (silhouette of the replicate programmes) is within
 STABILITY_SLACK of the best -- the most resolved solution that is still about as
 stable as any -- unless CNMF_K sets it; k_selection.csv keeps the statistics, so
-another K needs only the consensus step (--k K --skip-factorize).
+another K needs only the consensus step (--k K --skip-factorize). Once every
+stratum is fitted, --finalise gives both chemistries of a dataset one K: the
+largest that passes that rule in both (a different K would split a programme
+in one chemistry but not the other, and fewer would pair).
 
 Outputs
   <AIM_WORK>/cnmf/<ns>/            cNMF working files (replicates, consensus)
@@ -60,9 +63,46 @@ def _worker(args):
     cNMF(output_dir=out_dir, name=name).factorize(worker_i=i, total_workers=n)
 
 
+def stable_ks(stats: pd.DataFrame) -> set[int]:
+    """The K whose stability is within STABILITY_SLACK of the best."""
+    return set(stats.loc[stats.silhouette >= stats.silhouette.max() - STABILITY_SLACK, "k"].astype(int))
+
+
 def choose_k(stats: pd.DataFrame) -> int:
-    best = stats.silhouette.max()
-    return int(stats.loc[stats.silhouette >= best - STABILITY_SLACK, "k"].max())
+    return max(stable_ks(stats))
+
+
+def finalise(args) -> None:
+    """One K per dataset: the largest K that passes the stability rule in both chemistries.
+
+    Run after the per-stratum fits (which each took their own K, so results exist
+    either way). Strata whose K changes get a new consensus from their saved
+    replicates; the v2 and v3 programmes then have the same resolution, so one
+    is not split where the other is not.
+    """
+    by_ds = {}
+    for key, chem, ns in cli.dataset_variants(args):
+        by_ds.setdefault(key, []).append((chem, ns))
+    for key, strata in by_ds.items():
+        stats = {}
+        for chem, ns in strata:
+            f = config.CSV_EXPORTS / ns / SUBDIR / "k_selection.csv"
+            if f.exists():
+                stats[(chem, ns)] = pd.read_csv(f)
+        if len(stats) < 2:
+            log(f"  {key}: K statistics for {len(stats)} stratum(s) only -- nothing to align")
+            continue
+        common = set.intersection(*(stable_ks(t) for t in stats.values()))
+        if not common:
+            log(f"  {key}: no K passes the stability rule in every stratum -- keeping each stratum's own K")
+            continue
+        k = max(common)
+        for (chem, ns), t in stats.items():
+            current = int(t.loc[t.chosen.astype(bool), "k"].iloc[0]) if t.chosen.astype(bool).any() else None
+            log(f"  {key} {chem}: K {current} -> {k}" + ("" if current != k else " (unchanged)"))
+            if current != k:
+                args.k, args.skip_factorize = k, True
+                run(key, args, chem, ns)
 
 
 def go_terms() -> dict[str, set[str]]:
@@ -172,7 +212,12 @@ def main() -> None:
                    help="NMF replicates per K")
     p.add_argument("--skip-factorize", action="store_true",
                    help="reuse the replicates of an earlier run; only redo the consensus (e.g. for another K)")
+    p.add_argument("--finalise", action="store_true",
+                   help="after all strata are fitted: give both chemistries of a dataset the same K")
     args = p.parse_args()
+    if args.finalise:
+        finalise(args)
+        return
     for key, chem, ns in cli.dataset_variants(args):
         run(key, args, chem, ns)
 

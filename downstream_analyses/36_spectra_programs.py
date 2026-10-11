@@ -30,7 +30,8 @@ Method
      gene-gene graph that every global factor, free ones too, is fitted to. Per
      core factor: NDD set genes among its top 50 vs the expectation from each
      gene's level x spread bin in the same chemistry's clusters (exact
-     Poisson-binomial p); a steered factor's own prior-set genes are left out;
+     Poisson-binomial p; GWAS lists one gene per locus); a steered factor's own
+     prior-set genes are left out;
      BH per dataset; replicated when q < 0.05 for both factors of a v2 / v3 pair;
      the pair's held-out support and age trend are reported with it. The same
      for a third fit (SPECTRA_PRIOR=string: core prior + STRING network modules;
@@ -236,8 +237,13 @@ def labelled_pairs(f2, f3, ds: str) -> pd.DataFrame:
 
 
 def ndd_sets_for(ds: str, out: C.Output) -> dict:
-    """User lists (uncollapsed) and seed NDD panels."""
-    sets = {f"list:{k}": set(v) for k, v in C.mapped_lists(ds, collapse=False).items()}
+    """User lists and seed NDD panels, for enrichment tests.
+
+    GWAS lists keep one gene per locus (C.mapped_lists' collapse), as everywhere
+    else: a locus such as the chr6 histone cluster would otherwise count as a
+    dozen genes and make any programme holding it look enriched.
+    """
+    sets = {f"list:{k}": set(v) for k, v in C.mapped_lists(ds).items()}
     pan = C.panels(C.ns(ds, "v2"))
     out.used(f"{C.ns(ds, 'v2')}/11_panels/panel_coverage.csv")
     for pname, g in pan[pan.panel_group == "ndd"].groupby("panel"):

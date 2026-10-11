@@ -21,7 +21,12 @@
 #
 #   for ds in cortex human_dev; do for ch in v2 v3; do
 #     sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_cnmf.sh; done; done
-# Another K from the saved replicates (consensus only, minutes): CNMF_K=30 CNMF_SKIP_FACTORIZE=true
+# Then one K per dataset (largest passing the stability rule in both chemistries;
+# consensus redone only where K changes), automatically after the four jobs:
+#   ids=$(for ds in cortex human_dev; do for ch in v2 v3; do
+#     sbatch --parsable --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_cnmf.sh; done; done | paste -sd:)
+#   sbatch --dependency=afterok:$ids --export=ALL,CNMF_FINALISE=true slurm_cnmf.sh
+# Another K by hand (consensus only, minutes): CNMF_K=30 CNMF_SKIP_FACTORIZE=true
 
 set -uo pipefail
 
@@ -32,8 +37,11 @@ trap aim_report EXIT
 
 export AIM_WORK="${AIM_WORK:-/miridan-data/annaludmir/aim_work}"
 CNMF_SKIP_FACTORIZE="${CNMF_SKIP_FACTORIZE:-false}"
-[[ "$DATASET" == "all" ]] && { echo "set DATASET=cortex or human_dev (one stratum per job)"; exit 1; }
-[[ "$CHEMISTRY" == "each" ]] && { echo "set CHEMISTRY=v2 or v3 (one stratum per job)"; exit 1; }
+CNMF_FINALISE="${CNMF_FINALISE:-false}"
+if [[ "$CNMF_FINALISE" != "true" ]]; then
+  [[ "$DATASET" == "all" ]] && { echo "set DATASET=cortex or human_dev (one stratum per job)"; exit 1; }
+  [[ "$CHEMISTRY" == "each" ]] && { echo "set CHEMISTRY=v2 or v3 (one stratum per job)"; exit 1; }
+fi
 
 module load mamba/mamba-1.5.8
 mamba activate "$AIM_ENV"
@@ -46,6 +54,11 @@ if ! mamba run -p "$AIM_ENV" python -c "import cnmf" 2>/dev/null; then
   exit 1
 fi
 
+if [[ "$CNMF_FINALISE" == "true" ]]; then
+  aim_run 26_cnmf --finalise
+  (( ${#AIM_FAILED[@]} == 0 )) || exit 1
+  exit 0
+fi
 [[ -f "${AIM_WORK}/spectra/${DATASET}__${CHEMISTRY}/input.h5ad" ]] || aim_run 24_spectra_input
 if [[ "$CNMF_SKIP_FACTORIZE" == "true" ]]; then
   aim_run 26_cnmf --skip-factorize
