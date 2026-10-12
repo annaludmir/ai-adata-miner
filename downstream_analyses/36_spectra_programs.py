@@ -80,6 +80,12 @@ MATCH_TOP = 0.3     # share of shared top genes at which a prior-free programme 
 MAX_LISTED = 10
 
 
+# script 28 scores every cell with each fit; its per-group means replace the subsample's when present
+PROJECTED = {"25_spectra": "spectra_full", "25_spectra_core": "spectra_core", "25_spectra_string": "spectra_string",
+             "26_cnmf": "cnmf", "27_schpf": "schpf"}
+SCORE_SOURCE = {}       # (namespace, sub) -> "all cells" | "subsample"
+
+
 def load(n: str, out: C.Output, sub: str = "25_spectra"):
     base = C.EXPORTS / n / sub
     if not (base / "factor_info.csv").exists():
@@ -90,6 +96,12 @@ def load(n: str, out: C.Output, sub: str = "25_spectra"):
     info = pd.read_csv(base / "factor_info.csv").set_index("factor")
     w = pd.read_csv(base / "factor_gene_weights.csv").set_index("factor")
     scores = pd.read_csv(base / "factor_scores_by_group.csv")
+    proj = C.EXPORTS / n / "28_projection" / PROJECTED.get(sub, "") / "factor_scores_by_group.csv"
+    SCORE_SOURCE[(n, sub)] = "subsample"
+    if sub in PROJECTED and proj.exists():
+        out.used(f"{n}/28_projection/{PROJECTED[sub]}/factor_scores_by_group.csv")
+        scores = pd.read_csv(proj)
+        SCORE_SOURCE[(n, sub)] = "all cells"
     pri = pd.read_csv(base / "prior_sets.csv") if (base / "prior_sets.csv").exists() else pd.DataFrame()
     return info, w, scores, pri
 
@@ -395,6 +407,14 @@ def core_section(out: C.Output, rng: np.random.Generator, variant: str = "core")
 
     f = []
     ok = support[(support.q < 0.05) & (support.effect_vs_null_sd > 0)]
+    src = sorted({SCORE_SOURCE.get((C.ns(ds, ch), sub), "subsample") for ds, ch in C.STRATA if fits.get((ds, ch))})
+    chk = []
+    for ds, ch in C.STRATA:
+        pc = C.EXPORTS / C.ns(ds, ch) / "28_projection" / PROJECTED[sub] / "projection_check.csv"
+        if pc.exists():
+            out.used(f"{C.ns(ds, ch)}/28_projection/{PROJECTED[sub]}/projection_check.csv")
+            t = pd.read_csv(pc)
+            chk.append(f"{ds} {ch} median r {t.pearson_r.median():.2f}, {int((t.pearson_r < 0.9).sum())} below 0.9")
     what = {"core": "GO processes, cell-cycle panels and class markers only, more free factors",
             "string": "the core prior plus STRING network modules (experimental / database evidence)",
             "cnmf": "consensus NMF, no prior at all; K chosen by stability (script 26)",
@@ -403,7 +423,9 @@ def core_section(out: C.Output, rng: np.random.Generator, variant: str = "core")
                  f"{ds} {ch}: {len(g)} factors ({int(g.free.sum())} free), "
                  f"{len(ok[(ok.dataset == ds) & (ok.chemistry == ch)])} supported in the other chemistry's donors"
                  for (ds, ch), g in overview.groupby(["dataset", "chemistry"])) + "; v2 / v3 pairs: "
-             + ", ".join(f"{ds} {len(g)}" for ds, g in pairs.groupby("dataset")) + ".")
+             + ", ".join(f"{ds} {len(g)}" for ds, g in pairs.groupby("dataset")) + ". Activity over age from "
+             + " / ".join(src) + (" (script 28 projection; projected vs fitted on the subsample: " + "; ".join(chk) + ")"
+                                  if chk else "") + ".")
     if len(erep):
         rp = erep[erep.replicated].copy()
         lead = {(r.dataset, r.factor): ", ".join(str(r.top_genes).split("|")[:5])
@@ -609,7 +631,9 @@ def main() -> None:
     ov = overview.groupby(["dataset", "chemistry"]).apply(
         lambda g: f"{len(g)} factors, {int((g.label != 'new').sum())} recovering a prior set, "
                   f"{int((g.label == 'new').sum())} new", include_groups=False)
-    f.append("**Fits**: " + "; ".join(f"{ds} {ch}: {v}{trained.get((ds, ch), '')}" for (ds, ch), v in ov.items()) + ".")
+    f.append("**Fits**: " + "; ".join(f"{ds} {ch}: {v}{trained.get((ds, ch), '')}" for (ds, ch), v in ov.items())
+             + "; activity over age from " + " / ".join(sorted({SCORE_SOURCE.get((C.ns(ds, ch), "25_spectra"), "subsample")
+                                                         for ds, ch in C.STRATA if fits.get((ds, ch))})) + ".")
     if len(pairs):
         for ds, g in pairs.groupby("dataset"):
             same = g[g.label_v2 == g.label_v3]

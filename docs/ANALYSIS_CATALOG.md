@@ -142,7 +142,9 @@ also form a programme that replicates across chemistries and holds in held-out
 donors. Two prior-free fits on the same cells and genes, consensus NMF (script
 26, `slurm_cnmf.sh`) and scHPF (script 27, `slurm_schpf.sh`, same K), get the
 same tests, and 36 matches their programmes to the core- and STRING-prior ones
-and to each other by shared top genes. Write-up of the design and
+and to each other by shared top genes. Script 28 (`slurm_project.sh`) scores
+every cell of each stratum with every fit (gene side fixed), so 36's activity
+trends rest on all cells rather than the subsample. Write-up of the design and
 findings: [GENE_PROGRAMMES.md](GENE_PROGRAMMES.md).
 
 **Data facts found along the way**: cortex's fine clusterings (`Clusters`,

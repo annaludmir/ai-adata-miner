@@ -215,6 +215,20 @@ for ds in cortex human_dev; do for ch in v2 v3; do
 done; done
 ```
 
+**Score every cell (script 28).** The fits use a subsample; script 28 holds each
+fit's gene side fixed and estimates programme activity for every cell of the
+stratum (Spectra: its exact model, Poisson loadings; cNMF: its own usage refit;
+scHPF: its `project`). Analysis 36 then takes its age, region and donor trends
+from all cells. `projection_check.csv` compares projected and fitted activity on
+the subsample cells (r near 1; a low r flags near-duplicate programmes). One job
+per stratum, after the fits (~1-2 h each for human_dev):
+
+```bash
+for ds in cortex human_dev; do for ch in v2 v3; do
+  sbatch --export=ALL,DATASET=$ds,CHEMISTRY=$ch slurm_project.sh
+done; done
+```
+
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
 

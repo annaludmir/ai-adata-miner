@@ -93,6 +93,7 @@ Everything is in the ai-adata-miner repository: analysis 36 (`downstream_analyse
 | Spectra fits | `scripts_generated/25_spectra_fit.py` (`SPECTRA_PRIOR=full`, `core` or `string`) | `csv_exports/<stratum>/25_spectra/`, `25_spectra_core/`, `25_spectra_string/` |
 | cNMF fit | `scripts_generated/26_cnmf.py`, then `--finalise` for one K per dataset | `csv_exports/<stratum>/26_cnmf/` |
 | scHPF fit (second prior-free method, results pending) | `scripts_generated/27_schpf.py` (K = the cNMF K) | `csv_exports/<stratum>/27_schpf/` |
+| Every cell scored (activity trends on all cells) | `scripts_generated/28_project_programs.py` | `csv_exports/<stratum>/28_projection/<fit>/` |
 | Tests and comparison | `downstream_analyses/36_spectra_programs.py` (step 3) | `core_*`, `string_*`, `cnmf_*`, `schpf_*` CSVs; `string_module_ndd_content.csv`; `prior_free_matches.csv` |
 
 On powerslurm, `running_scripts/slurm_spectra.sh`, `slurm_cnmf.sh` and `slurm_schpf.sh` run one stratum per job; their headers and `running_scripts/README.md` give the exact commands. STRING v12 files come from `running_scripts/fetch_annotations.sh`.
