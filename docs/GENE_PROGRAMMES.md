@@ -1,12 +1,12 @@
 # Gene programmes and NDD genes in the developing brain
 
-_As of 11 October 2026; analysis 36 and scripts 24-26._
+_As of 12 October 2026; analysis 36 and scripts 24-28._
 
 ## Summary
 
-Neurodevelopmental-disorder (NDD) genes gather in two gene programmes of the developing brain, and otherwise do not form programmes of their own. We asked whether NDD gene lists form gene programmes when programmes are learned from single-cell data, with and without prior knowledge of gene networks. We fitted four kinds of programme model to two developing-brain datasets, each split by 10x chemistry into two donor-disjoint replicates, and kept only results seen in both.
+Neurodevelopmental-disorder (NDD) genes gather in two gene programmes of the developing brain, and otherwise do not form programmes of their own. We asked whether NDD gene lists form gene programmes when programmes are learned from single-cell data, with and without prior knowledge of gene networks. We fitted five programme models to two developing-brain datasets, each split by 10x chemistry into two donor-disjoint replicates, and kept only results seen in both.
 
-- **Microcephaly genes sit in the progenitor proliferation programme** (human\_dev): 9.3–13.2× more than expression level predicts, in two different fits and both chemistries (BLM, CENPJ, CIT, PLK4, POC1A, STIL).
+- **Microcephaly genes sit in the progenitor proliferation programme** (human\_dev): 6.8–13.2× more than expression level predicts, in three different models and both chemistries (BLM, CENPJ, CIT, PLK4, POC1A, STIL; ASPM, BUB1, CENPE in scHPF). The programme's activity in midbrain radial glia falls with age.
 - **Synaptic NDD genes sit in a glutamate-receptor network module** (cortex): a STRING module of DLG4, GRIN1, GRIN2A, GRIA1/2, CACNG2 and GRIK2 forms a programme that replicates across chemistries and holds in held-out donors.
 - **AD GWAS genes sit in microglia** (human\_dev, 10.3×/14.0×; BIN1, SPI1, MAF): known biology, recovered with no prior at all, which shows the test can find real signal.
 
@@ -21,16 +21,17 @@ Every fit used the same cells, and every result had to hold in two independent s
 - **One subsample per stratum.** Up to 2,500 cells per cell class (classes with at least 200 cells), at most 25,000 cells, fixed seed: 12,500 cells per cortex stratum and about 24,000 per human\_dev stratum. Models used the 3,000 most variable genes, plus each fit's prior-set genes.
 - **Gene lists.** The user NDD lists (ASD SFARI tiers, ASD\_HC, autism\_strong, ASD syndromic, microcephaly, BP and AD GWAS) and curated NDD panels (epilepsy/DEE, ID/DD, chromatin regulators, synaptic genes). GWAS lists count one gene per locus.
 
-## The four programme fits
+## The five programme fits
 
-Only the three fits whose prior holds no NDD list can test the lists; the list-guided fit can only show what the prior imposes. Spectra (Kunes et al. 2023) learns programmes steered by a gene-gene graph built from prior gene sets, plus free programmes with no prior; cNMF (Kotliar et al. 2019) uses no prior at all.
+Only the four fits whose prior holds no NDD list can test the lists; the list-guided fit can only show what the prior imposes. Spectra (Kunes et al. 2023) learns programmes steered by a gene-gene graph built from prior gene sets, plus free programmes with no prior; cNMF (Kotliar et al. 2019) and scHPF (Levitin et al. 2019) use no prior at all.
 
 | Fit | Prior | Programmes per stratum (cortex / human\_dev) | Can show | Cannot show |
 | --- | --- | --- | --- | --- |
 | Spectra, list-guided | NDD lists and panels, 29 core GO processes, cell-cycle panels, class markers | 60 / 71–72 | Which prior programmes the data support | Whether the lists cohere: the lists dominate the graph and even free programmes are pulled into them |
 | Spectra, core prior | 29 GO processes, cell-cycle panels, class markers; 15 free global programmes | 56 / 67–68 | NDD lists in programmes they did not shape | Programmes outside the core biology the prior names |
 | Spectra, STRING prior | Core prior plus 60 STRING network modules (experimental or curated evidence ≥ 700, no text mining) | 116 / 127–128 | Network modules rich in NDD genes that the data confirm as programmes | NDD genes a module already contains, as data-driven additions |
-| cNMF, no prior | None; K chosen by stability, the same K for both chemistries | 25 / 30 | Programmes found with no prior knowledge | Fine programmes in rare cell types below cNMF's resolution |
+| cNMF, no prior | None; K chosen by stability, the same K for both chemistries | 25 / 30 | Programmes found with no prior knowledge | Fine programmes in rare cell types below its resolution |
+| scHPF, no prior | None; Poisson factorisation of raw counts, cNMF's K, best of 5 starts | 25 / 30 | Whether a prior-free result depends on the method | As cNMF; its top genes favour programme-specific genes, so it matches the other fits less often in cortex |
 
 Spectra runs used a plateau learning-rate rule in place of the package's own. The package's rule stopped one fit at epoch 431 of 5,000 and left the others at a learning rate of 0.001 from about epoch 150. All final fits converged, after 2,900–3,900 epochs.
 
@@ -41,7 +42,7 @@ A programme's label proves nothing: a programme steered by a gene set can echo t
 1. **Replication.** v2 and v3 programmes are paired when each is the other's best match by cosine similarity of gene weights (≥ 0.5).
 2. **Held-out support.** The mean pairwise Spearman correlation of a programme's top 50 genes across the *other* chemistry's cluster pseudobulks (other donors), against 500 random gene sets matched on expression level and spread.
 3. **NDD enrichment.** For each list, the number of its genes among a programme's top 50 against the expected number. The expectation gives each list gene the chance that genes of similar expression level have of being a top gene, since NDD genes tend to be long and highly expressed in neurons; the p-value is exact (Poisson-binomial). For a programme steered by a GO set, marker panel or STRING module, that set's genes are left out first. Results are BH-corrected per dataset and count only when q < 0.05 in both chemistries.
-4. **Age trends.** Spearman correlation of mean programme activity with age within each cell class, pooled over regions and within each region (human\_dev sampled different regions at different ages), combined across chemistries.
+4. **Age trends.** Spearman correlation of mean programme activity with age within each cell class, pooled over regions and within each region (human\_dev sampled different regions at different ages), combined across chemistries. Activity comes from every cell of the stratum: each fit's gene side is held fixed and all cells are scored (projected and fitted activity agree at median r 0.99–1.00 on the subsample).
 
 ## Findings
 
@@ -53,10 +54,11 @@ Three NDD-gene results replicate in both chemistries; four more are significant 
 | --- | --- | --- | --- | --- | --- |
 | Progenitor proliferation (free; RRM2, CDK1, MELK, ASPM, TOP2A) | human\_dev | Core prior | Microcephaly | 9.7 / 9.3 | BLM, CENPJ, CIT, H4C3, PLK4, POC1A, STIL |
 | Same programme | human\_dev | STRING prior | Microcephaly | 13.2 / 10.9 | adds BRIP1, GMNN, KIF11 |
+| Same programme (UBE2C, TOP2A, CDK1, MKI67) | human\_dev | scHPF | Microcephaly | 7.5 / 6.8 | ASPM, BUB1, CENPE, CENPF, NUF2 |
 | STRING module M074, glutamate receptors and PSD (DLG4, GRIN1, GRIN2A/B, GRIA1–4, CACNG2, GRIK2) | cortex | STRING prior | Synaptic panel / autism\_strong / ASD\_SFARI\_2 | 47 / 14 / 7 (the module's own content) | DLG4, GRIN1, GRIN2A, GRIA1, GRIA2, CACNG2, GRIK2 |
 | Microglia (free; P2RY12, AIF1, GPR34) | human\_dev | cNMF | AD GWAS | 10.3 / 14.0 | BIN1, MAF, SPI1 |
 
-The proliferation programme is the most robust: two priors, both chemistries, and its top genes co-express in held-out donors at +56 to +63 SD. The synapse module's NDD content is a property of the network; what the data add is that the module forms a programme that replicates and holds in held-out donors (+13.9 SD in v2, +3.5 SD in v3).
+The proliferation programme is the most robust: three models (two Spectra priors and scHPF, with cNMF significant in v3), both chemistries, and its top genes co-express in held-out donors at +55 to +63 SD. In scHPF its activity in midbrain radial glia falls with age in both chemistries. The synapse module's NDD content is a property of the network; what the data add is that the module forms a programme that replicates and holds in held-out donors (+13.9 SD in v2, +3.5 SD in v3).
 
 **Suggestive (one chemistry)**
 
@@ -65,7 +67,7 @@ The proliferation programme is the most robust: two priors, both chemistries, an
 - Microcephaly genes in proliferation in cNMF (human\_dev, 5.3× / 8.4×, v3 significant), and in cortex a DNA-replication programme with the Meier–Gorlin genes CDT1, GINS2, GMNN and MCM7 (3.7× in both, not significant).
 - autism\_strong in a free human\_dev neuron programme marking midbrain and hindbrain inhibitory neurons (LHX1, GATA3, SOX14; MYT1L, DSCAM, SCN2A, SHANK2): 4.0× in v3, 1.8× in v2.
 
-**Programmes in general.** Most programmes are real: 41–72 of each Spectra fit's and 23–28 of each cNMF fit's are supported in held-out donors. The Spectra core and STRING fits recover about half of cNMF's cortex programmes and two thirds of its human\_dev ones; what they miss is mostly rare cell types (multiciliated cells, Cajal–Retzius cells, cortical hem, astrocytes) and stress or dissociation programmes (FOS, EGR1, HSPA1A). Neither replicated NDD programme changes with age consistently across chemistries.
+**Programmes in general.** Most programmes are real: 41–72 of each Spectra fit's, 23–28 of each cNMF fit's and 17–22 of each scHPF fit's are supported in held-out donors. cNMF and scHPF agree on about half of the cortex programmes and two thirds of the human\_dev ones. The Spectra core and STRING fits recover about half of cNMF's cortex programmes and two thirds of its human\_dev ones; what they miss is mostly rare cell types (multiciliated cells, Cajal–Retzius cells, cortical hem, astrocytes) and stress or dissociation programmes (FOS, EGR1, HSPA1A). With activity scored on all cells, 9 of the 55 pooled age trends in the list-guided fit also hold within a single region and 38 more point the same way; the 4 that reverse are all in cerebellar IPCs, where the pooled trend follows which regions were sampled at each age.
 
 ## What is circular, and caveats
 
@@ -79,7 +81,7 @@ The list-guided fit cannot test the lists, and several early results were artefa
 Caveats:
 
 - Only each programme's top 50 genes are tested, so a list spread thinly across a programme would be missed.
-- Each fit uses a subsample of about 12,500–25,000 cells per stratum, so rare cell types contribute few cells, and per-region age points can rest on a few dozen cells.
+- Each fit learns its programmes from a subsample of about 12,500–25,000 cells per stratum, so programmes confined to small subpopulations within a class may be missed; activities are then scored on all cells.
 - human\_dev sampled different brain regions at different ages, so age trends pooled over regions can follow sampling; within-region trends have 5–7 age points per chemistry.
 - STRING modules were built from experimental and curated-database evidence only; using text mining would bias them towards genes already studied with NDDs.
 
@@ -92,8 +94,8 @@ Everything is in the ai-adata-miner repository: analysis 36 (`downstream_analyse
 | Cell subsample | `scripts_generated/24_spectra_input.py` | `aim_work/spectra/<dataset>__<chemistry>/input.h5ad` |
 | Spectra fits | `scripts_generated/25_spectra_fit.py` (`SPECTRA_PRIOR=full`, `core` or `string`) | `csv_exports/<stratum>/25_spectra/`, `25_spectra_core/`, `25_spectra_string/` |
 | cNMF fit | `scripts_generated/26_cnmf.py`, then `--finalise` for one K per dataset | `csv_exports/<stratum>/26_cnmf/` |
-| scHPF fit (second prior-free method, results pending) | `scripts_generated/27_schpf.py` (K = the cNMF K) | `csv_exports/<stratum>/27_schpf/` |
-| Every cell scored (activity trends on all cells) | `scripts_generated/28_project_programs.py` | `csv_exports/<stratum>/28_projection/<fit>/` |
+| scHPF fit | `scripts_generated/27_schpf.py` (K = the cNMF K) | `csv_exports/<stratum>/27_schpf/` |
+| Every cell scored | `scripts_generated/28_project_programs.py` | `csv_exports/<stratum>/28_projection/<fit>/` |
 | Tests and comparison | `downstream_analyses/36_spectra_programs.py` (step 3) | `core_*`, `string_*`, `cnmf_*`, `schpf_*` CSVs; `string_module_ndd_content.csv`; `prior_free_matches.csv` |
 
-On powerslurm, `running_scripts/slurm_spectra.sh`, `slurm_cnmf.sh` and `slurm_schpf.sh` run one stratum per job; their headers and `running_scripts/README.md` give the exact commands. STRING v12 files come from `running_scripts/fetch_annotations.sh`.
+On powerslurm, `running_scripts/slurm_spectra.sh`, `slurm_cnmf.sh`, `slurm_schpf.sh` and `slurm_project.sh` run one stratum per job; their headers and `running_scripts/README.md` give the exact commands. STRING v12 files come from `running_scripts/fetch_annotations.sh`.
