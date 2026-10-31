@@ -229,6 +229,19 @@ for ds in cortex human_dev; do for ch in v2 v3; do
 done; done
 ```
 
+**Programmes as gene lists (script 29).** One CSV per programme (`gene` column,
+top 100 genes), e.g. for GSEA in ndd_gene_modules; default the core-prior Spectra
+fit, which holds no NDD list. CSV-only, seconds; run on the login node:
+
+```bash
+/miridan-data/annaludmir/conda-envs/jupyter-scanpy_new/bin/python scripts_generated/29_programme_gene_lists.py
+#   --free-only (no prior set at all)  --replicated-only (paired v2 / v3)  --n-top 50
+#   --fit string | cnmf | schpf | full
+```
+
+Lists go to `csv_exports/_programme_gene_lists/<fit>/` with an `index.csv`, and a
+`consensus/` folder of the genes shared by each replicated v2 / v3 pair.
+
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
 
