@@ -240,7 +240,12 @@ fit, which holds no NDD list. CSV-only, seconds; run on the login node:
 ```
 
 Lists go to `csv_exports/_programme_gene_lists/<fit>/` with an `index.csv`, and a
-`consensus/` folder of the genes shared by each replicated v2 / v3 pair.
+`consensus/` folder of the genes shared by each replicated v2 / v3 pair (with its
+own `index.csv`). Both indexes describe each list -- scope, free / steered and prior
+label, top GO BP terms (needs `gmt/GO_Biological_Process_2023.gmt` from
+fetch_annotations.sh), top genes -- in a one-line `description`; ndd_gene_modules'
+`build_batch_summary.py` adds it to the GSEA batch summary when the index sits
+next to the lists.
 
 To rewrite the per-group scores of finished fits (e.g. after a grouping is
 added) without refitting, run on a compute node:
